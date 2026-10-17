@@ -1,0 +1,9 @@
+node_modules/
+.wrangler/
+.anahtar
+.arsiv-anahtari
+.dev.vars
+.adres
+.klasor
+*.log
+_arsiv-deneme/

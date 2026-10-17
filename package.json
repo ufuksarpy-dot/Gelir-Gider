@@ -1,0 +1,15 @@
+{
+  "name": "bank-of-usy",
+  "version": "2.0.0",
+  "private": true,
+  "description": "BANK OF USY — kişisel bütçe uygulaması (telefonda çalışan PWA; veri yalnızca telefonda)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js",
+    "yayinla": "node yayinla.js",
+    "yerel": "node sunucu.js"
+  }
+}
