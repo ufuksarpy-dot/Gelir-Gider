@@ -316,3 +316,12 @@ test('varlikDagilimi: bütün yatırım hesapları Yatırım kutusunda, banka he
   const d = H.varlikDagilimi(v);
   assert.equal(d.yatirim + d.hesaplar + d.kartBorcu, H.netVarlik(v) - H.aileAlacagi(v));
 });
+
+test('sabitIlkAy: geçmiş başlangıç gününden sonraki ilk vade; son vadeden sonra ödeme yok', () => {
+  assert.equal(H.sabitIlkAy(16, '2026-10-13'), '2026-10'); // 16 Ekim başlangıçtan sonra
+  assert.equal(H.sabitIlkAy(10, '2026-10-13'), '2026-11');
+  assert.equal(H.sabitIlkAy(13, '2026-10-13'), '2026-10'); // aynı gün dahil
+  assert.equal(H.sabitIlkAy(31, '2026-02-27'), '2026-02'); // şubatta ayın sonuna oturur
+  const taksit = { gun: 3, periyot: 1, ilk_ay: H.sabitIlkAy(3, '2026-10-13'), son_vade: '2027-01-03' };
+  assert.deepEqual(H.sabitVadeleri(taksit, '2026-10-13', '2027-12-31'), ['2026-11-03', '2026-12-03', '2027-01-03']);
+});

@@ -1291,10 +1291,10 @@ function sonrakiAylar(n = 12) {
   return l;
 }
 
-function ilkAyHesapla(gun, periyot, secilen) {
+// Sihirbazda `baz` başlangıç günüdür: geçmiş bir gün seçildiyse o günden bugüne düşen vadeler de oluşur.
+function ilkAyHesapla(gun, periyot, secilen, baz = bugun()) {
   if (Number(periyot) > 1 && secilen) return secilen;
-  const b = bugun();
-  return Number(gun) >= Number(b.slice(8, 10)) ? b.slice(0, 7) : H.ekleAy(b.slice(0, 7), 1);
+  return H.sabitIlkAy(gun, baz);
 }
 
 function sabitDuzenle(id) {
@@ -1570,6 +1570,7 @@ function sAdimSabitler(S) {
       <label class="alan"><span>Periyot</span><select name="s${i}_periyot">${secenekler(PERIYOTLAR, s.periyot || 1)}</select></label></div>
       <div class="yan"><label class="alan"><span>Hesap</span><select name="s${i}_hesap">${secenekler(hesaplar, s.hesap || S.roller.harcama)}</select></label>
       <label class="alan"><span>Sıradaki ay (3/6/12 ay için)</span><select name="s${i}_ilk">${secenekler(sonrakiAylar(), s.ilk, 'Otomatik')}</select></label></div>
+      <label class="alan"><span>Son vade (taksit, kredi gibi biterse; sonra kendiliğinden durur)</span>${sGirdi(`s${i}_sonvade`, s.sonvade, 'type="date"')}</label>
       <div class="cipler">
         <label class="cip"><input type="checkbox" name="s${i}_degisken" ${s.degisken ? 'checked' : ''}> değişken</label>
         <label class="cip"><input type="checkbox" name="s${i}_otomatik" ${s.otomatik ? 'checked' : ''}> otomatik</label>
@@ -1597,8 +1598,8 @@ function sihirbazVerisi(S) {
   }));
   const kategoriler = S.kategoriler.map((x, i) => ({ id: x.id, ad: x.ad, simge: x.simge, tur: x.is_gideri ? 'aylik' : x.tur, limit_tutar: k(x.limit), is_gideri: x.is_gideri ? 1 : 0, hizli: 1, sira: i }));
   const sabitler = S.sabitler.map((s) => ({
-    id: s.id, ad: s.ad, tutar: k(s.tutar), gun: Number(s.gun), periyot: Number(s.periyot) || 1, ilk_ay: ilkAyHesapla(s.gun, s.periyot, s.ilk),
-    hesap_id: s.hesap || S.roller.harcama || null, degisken: s.degisken ? 1 : 0, otomatik: s.otomatik ? 1 : 0, is_gideri: s.is_gideri ? 1 : 0, aile: s.aile ? 1 : 0,
+    id: s.id, ad: s.ad, tutar: k(s.tutar), gun: Number(s.gun), periyot: Number(s.periyot) || 1, ilk_ay: ilkAyHesapla(s.gun, s.periyot, s.ilk, S.baslangic || bugun()),
+    son_vade: s.sonvade || null, hesap_id: s.hesap || S.roller.harcama || null, degisken: s.degisken ? 1 : 0, otomatik: s.otomatik ? 1 : 0, is_gideri: s.is_gideri ? 1 : 0, aile: s.aile ? 1 : 0,
   }));
   const hedefler = S.hedefler.map((h, i) => ({ id: h.id, ad: h.ad, hedef_tutar: k(h.hedef), hesap_id: h.hesap || S.roller.birikim || null, hafta_farki: h.hafta_farki ? 1 : 0, sira: i }));
   const ayarlar = {
@@ -1657,7 +1658,7 @@ function sihirbazTopla() {
   if (S.adim === 3) {
     S.sabitler.forEach((s, i) => {
       s.ad = v(`s${i}_ad`); s.tutar = v(`s${i}_tutar`); s.gun = v(`s${i}_gun`); s.periyot = Number(v(`s${i}_periyot`)) || 1;
-      s.hesap = v(`s${i}_hesap`); s.ilk = v(`s${i}_ilk`); s.degisken = c(`s${i}_degisken`); s.otomatik = c(`s${i}_otomatik`); s.is_gideri = c(`s${i}_is`); s.aile = c(`s${i}_aile`);
+      s.hesap = v(`s${i}_hesap`); s.ilk = v(`s${i}_ilk`); s.sonvade = v(`s${i}_sonvade`); s.degisken = c(`s${i}_degisken`); s.otomatik = c(`s${i}_otomatik`); s.is_gideri = c(`s${i}_is`); s.aile = c(`s${i}_aile`);
     });
   }
   if (S.adim === 4) S.yatirim = v('yatirim');
@@ -1747,7 +1748,7 @@ function sihirbazEylem(eylem, el) {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.1';
+const SURUM = '1.2';
 
 const EYLEMLER = {
   kapat: () => sayfaKapat(),

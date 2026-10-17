@@ -268,6 +268,12 @@ export function butcePayi(islem) {
 
 // ---------------------------------------------------------------- sabit kalemler
 
+// Yeni sabit ödemenin ilk ayı: `baz` gününden (bugün ya da geçmiş başlangıç günü) sonraki ilk vade.
+export function sabitIlkAy(gun, baz) {
+  const ay = baz.slice(0, 7);
+  return aydaGun(ay, Number(gun)) >= baz ? ay : ekleAy(ay, 1);
+}
+
 // Kalemin [bas, son] aralığındaki vade tarihleri.
 export function sabitVadeleri(kalem, bas, son) {
   const sonuc = [];

@@ -205,3 +205,23 @@ test('Excel sayfaları: bütün kayıtlar, ailem ödüyor ve artan bütçe gör�
   const maas = s[4].satirlar.find((r) => r[1] === 'Maaş');
   assert.equal(maas[3] + (maas[4] || 0) - (maas[5] || 0), maas[6]);
 });
+
+test('geçmiş başlangıç: başlangıçla bugün arasındaki sabit vade oluşur, son vadeli kalem biter', async () => {
+  const g = { gun: '2026-10-18' };
+  const api2 = yerelApi(bellekDeposu(), { bugun: () => g.gun });
+  await api2.istek('/kurulum', { yontem: 'POST', govde: {
+    baslangic: '2026-10-13',
+    ayar: { ay_baslangic_gunu: 10, maas: { tutar: 5000000, hesap_id: 'v-1111' }, harcama_hesabi: 'v-1111' },
+    hesaplar: [{ id: 'v-1111', ad: 'Deneme vadesiz', tur: 'vadesiz', acilis_bakiye: 1000000 }],
+    kategoriler: [{ id: 'k-1111', ad: 'Benzin', tur: 'haftalik', limit_tutar: 100000 }],
+    sabitler: [
+      { id: 's-park', ad: 'Deneme park', tutar: 100000, gun: 16, periyot: 1, ilk_ay: H.sabitIlkAy(16, '2026-10-13'), hesap_id: 'v-1111' },
+      { id: 's-tek', ad: 'Deneme tek taksit', tutar: 200000, gun: 10, periyot: 1, ilk_ay: H.sabitIlkAy(10, '2026-10-13'), son_vade: '2026-11-10', hesap_id: 'v-1111' },
+    ],
+  } });
+  let v = await api2.istek('/veri');
+  assert.ok(v.odemeler.some((o) => o.id === 'sabit:s-park:2026-10-16' && o.durum === 'bekliyor'));
+  g.gun = '2027-01-20';
+  v = await api2.istek('/veri');
+  assert.deepEqual(v.odemeler.filter((o) => o.ref_id === 's-tek').map((o) => o.vade), ['2026-11-10']);
+});
