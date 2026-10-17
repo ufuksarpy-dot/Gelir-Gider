@@ -299,3 +299,20 @@ test('islemDogrula', () => {
   assert.match(H.islemDogrula({ ...tamam, tur: 'transfer', hedef_id: 'vds' }), /Transfer/);
   assert.equal(H.islemDogrula({ ...tamam, tur: 'duzeltme', tutar: -50, hedef_id: 'vds' }), null);
 });
+
+test('varlikDagilimi: bütün yatırım hesapları Yatırım kutusunda, banka hesapları ayrı, kart borcu eksi', () => {
+  const v = {
+    ayar: ayar({ yatirim_hesabi: 'y-1' }),
+    hesaplar: [
+      { id: 'vds-1', tur: 'vadesiz', acilis_bakiye: 100000 },
+      { id: 'y-1', tur: 'yatirim', acilis_bakiye: 200000 },
+      { id: 'y-2', tur: 'yatirim', acilis_bakiye: 300000 },
+      { id: 'kart-1', tur: 'kart', acilis_bakiye: -40000 },
+      { id: 'eski', tur: 'vadesiz', acilis_bakiye: 999900, aktif: 0 },
+    ],
+    islemler: [{ id: 'tr-0001', tarih: '2026-10-14', tur: 'transfer', tutar: 50000, kaynak_id: 'vds-1', hedef_id: 'y-2' }],
+  };
+  assert.deepEqual(H.varlikDagilimi(v), { yatirim: 550000, hesaplar: 50000, kartBorcu: -40000 });
+  const d = H.varlikDagilimi(v);
+  assert.equal(d.yatirim + d.hesaplar + d.kartBorcu, H.netVarlik(v) - H.aileAlacagi(v));
+});

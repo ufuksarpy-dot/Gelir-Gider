@@ -494,8 +494,7 @@ function ozetCiz() {
   let html = `<header class="ust"><h1>BANK OF USY</h1><small>${e(H.tarihYaz(gun, true))}</small></header>`;
 
   // Net varlık: hesaplar + yatırım − kart borcu + aileden alacak
-  const kartBorcu = hesaplar.filter((h) => h.tur === 'kart').reduce((t, h) => t + (b.get(h.id) || 0), 0);
-  const nakit = hesaplar.filter((h) => h.tur !== 'kart' && h.id !== a.yatirim_hesabi).reduce((t, h) => t + (b.get(h.id) || 0), 0);
+  const { yatirim: yatirimToplam, hesaplar: nakit, kartBorcu } = H.varlikDagilimi(v);
   const bekleyenYatirim = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.hedef_id && o.hedef_id === a.yatirim_hesabi).reduce((t, o) => t + o.tutar, 0);
   let alt = '';
   if (yat?.buAy > 0) alt = `<div class="iyi kucuk">▲ ${para(yat.buAy)} bu ay yatırıma ayrıldı</div>`;
@@ -505,7 +504,7 @@ function ozetCiz() {
     <div class="buyuk">${paraParca(H.netVarlik(v))}</div>${alt}
     ${cizgiGrafik(H.netVarlikSerisi(v, gun).map((x) => x.tutar))}
     <div class="ucluk">
-      <div><div class="etiket-k">Yatırım</div><div class="serif">${para(yat ? yat.deger : 0, { tam: true })}</div></div>
+      <div><div class="etiket-k">Yatırım</div><div class="serif">${para(yatirimToplam, { tam: true })}</div></div>
       <div><div class="etiket-k">Hesaplar</div><div class="serif">${para(nakit, { tam: true })}</div></div>
       <div><div class="etiket-k">Kart borcu</div><div class="serif ${kartBorcu < 0 ? 'uyari' : ''}">${para(kartBorcu, { tam: true })}</div></div>
     </div>
@@ -1748,7 +1747,7 @@ function sihirbazEylem(eylem, el) {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.0';
+const SURUM = '1.1';
 
 const EYLEMLER = {
   kapat: () => sayfaKapat(),

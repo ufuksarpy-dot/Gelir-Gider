@@ -750,6 +750,20 @@ export function netVarlik(veri, tarih) {
   return t + aileAlacagi(v);
 }
 
+// Özet'teki üç kutu: yatırım (bütün yatırım hesapları + yatırım görevindeki hesap), banka hesapları, kart borcu.
+export function varlikDagilimi(veri) {
+  const ayar = ayarBirlestir(veri.ayar);
+  const b = bakiyeler(veri);
+  const d = { yatirim: 0, hesaplar: 0, kartBorcu: 0 };
+  for (const h of aktifler(veri.hesaplar)) {
+    const x = b.get(h.id) || 0;
+    if (h.tur === 'kart') d.kartBorcu += x;
+    else if (h.tur === 'yatirim' || h.id === ayar.yatirim_hesabi) d.yatirim += x;
+    else d.hesaplar += x;
+  }
+  return d;
+}
+
 // Son n bütçe ayının sonundaki net varlık (bu ay için bugün). Kurulumdan öncesi yok.
 export function netVarlikSerisi(veri, gun, n = 6) {
   const ayar = ayarBirlestir(veri.ayar);
