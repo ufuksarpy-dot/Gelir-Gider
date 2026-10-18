@@ -148,7 +148,7 @@ const manifest = {
 };
 writeFileSync(join(KOK, 'manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`);
 
-const KABUK = ['./', 'index.html', 'app.js', 'hesap.js', 'depo.js', 'yerel-api.js', 'excel.js', 'ice-aktar.js', 'deneme.js', 'vendor/xlsx.full.min.js', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
+const KABUK = ['./', 'index.html', 'app.js', 'hesap.js', 'depo.js', 'yerel-api.js', 'excel.js', 'ice-aktar.js', 'deneme.js', 'vendor/morphdom.js', 'vendor/xlsx.full.min.js', 'manifest.json', 'icon-180.png', 'icon-192.png', 'icon-512.png'];
 const ozet = createHash('sha256');
 for (const d of KABUK.slice(1)) ozet.update(readFileSync(join(KOK, d)));
 const surum = ozet.digest('hex').slice(0, 12);

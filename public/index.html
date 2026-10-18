@@ -50,7 +50,7 @@ body {
   overscroll-behavior-y: none;
 }
 button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+button { cursor: pointer; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; } /* basılı tutma (−/+ hızlanır, ödemede "Ödendi") iOS menüsü açmasın */
 .sayi { font-variant-numeric: tabular-nums; }
 main { max-width: 560px; margin: 0 auto; padding: 8px 16px 24px; }
 header.ust { display: flex; align-items: baseline; justify-content: space-between; padding: 12px 2px 8px; }

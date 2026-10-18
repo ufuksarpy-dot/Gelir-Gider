@@ -4,8 +4,22 @@ import { telefonDeposu, sifreliKasa, yedekOku } from './depo.js';
 import { yerelApi, ApiHata } from './yerel-api.js';
 import { excelSayfalari } from './excel.js';
 import { iceAktarOku, iceAktarIslemleri } from './ice-aktar.js';
+import morphdom from './vendor/morphdom.js';
 
 // ================================================================ durum ve yardımcılar
+
+// Ekran baştan yazılmaz, yalnız değişen yerler güncellenir (morphdom): yanıp sönme olmaz, kaydırma yeri,
+// açık bölümler (details) ve yazılmakta olan kutu korunur.
+function yerlestir(el, html) {
+  morphdom(el, `<div>${html}</div>`, {
+    childrenOnly: true,
+    onBeforeElUpdated(eski, yeni) {
+      if (eski.tagName === 'DETAILS') yeni.open = eski.open;
+      if (eski === document.activeElement && (eski.tagName === 'INPUT' || eski.tagName === 'TEXTAREA' || eski.tagName === 'SELECT')) return false;
+      return true;
+    },
+  });
+}
 
 const D = {
   veri: null,
@@ -169,7 +183,7 @@ function anaEkran() {
 function ciz() {
   if (!D.veri) return;
   const ekranlar = { ozet: ozetCiz, ay: ayCiz, cuzdan: cuzdanCiz, ayarlar: ayarlarCiz, hareketler: hareketlerCiz, sabitler: sabitlerCiz, kategoriler: kategorilerCiz };
-  $('#uyg').innerHTML = (ekranlar[D.ekran] || ozetCiz)();
+  yerlestir($('#uyg'), (ekranlar[D.ekran] || ozetCiz)());
   const ana = { hareketler: 'ozet', sabitler: 'ay', kategoriler: 'ayarlar' }[D.ekran] || D.ekran;
   for (const b of $$('#menu [data-ekran]')) b.classList.toggle('secili', b.dataset.ekran === ana);
 }
@@ -753,7 +767,7 @@ function girisCiz() {
       <p class="soluk kucuk">Kendi hesapların arasında para (ör. kart borcu ödemesi). Gider sayılmaz.</p>
       <button class="btn ana tam" data-eylem="transfer-kaydet">Kaydet</button>`;
   }
-  el.innerHTML = html;
+  yerlestir(el, html);
 }
 
 function girisTus(t) {
@@ -893,7 +907,7 @@ function dagitimCiz() {
   const a = ayar();
   const serbest = islem.tutar + d.artan - d.giderler - yatirim;
   const satir = (sol, sag) => `<div class="dagit-satir">${sol}${sag}</div>`;
-  $('#dagitim').innerHTML = `${sayfaBaslik(islem.gelir_kaynagi)}
+  yerlestir($('#dagitim'), `${sayfaBaslik(islem.gelir_kaynagi)}
     <div class="etiket-k">${maas ? 'Maaş yattı' : 'Gelir'} · ${e(hesapAdi(islem.hedef_id))} · ${e(H.tarihYaz(islem.tarih))}</div>
     <div class="buyuk">${paraParca(islem.tutar)}</div>
     <div class="kart" style="margin-top:12px">
@@ -906,7 +920,7 @@ function dagitimCiz() {
     ${serbest < 0 ? '<div class="dikkat">Gelir bu ayın planını karşılamıyor.</div>' : ''}
     ${yatirim > 0 && !a.yatirim_hesabi ? '<div class="dikkat">Yatırım hesabı seçilmedi (Ayarlar › Hesapların görevi); havale oluşmaz.</div>' : ''}
     <p class="soluk kucuk">Yatırım payı "yapılacak havale" olur. Bankadan gönderince Yaptım dersin.</p>
-    <button class="btn ana tam" data-eylem="dagitim-onayla">${yatirim > 0 ? 'Onayla ve yatırıma ayır' : 'Onayla'}</button>`;
+    <button class="btn ana tam" data-eylem="dagitim-onayla">${yatirim > 0 ? 'Onayla ve yatırıma ayır' : 'Onayla'}</button>`);
 }
 
 function dagitimDegistir(yon) {
@@ -944,7 +958,7 @@ function kismaCiz() {
   const K = D.kisma;
   const kisilan = Object.values(K.dagilim).reduce((t, x) => t + x, 0);
   const tamam = kisilan === K.toplam;
-  $('#kisma').innerHTML = `${sayfaBaslik(`${para(K.toplam)} geridesin`)}
+  yerlestir($('#kisma'), `${sayfaBaslik(`${para(K.toplam)} geridesin`)}
     ${K.sebep ? `<div class="uyari kucuk">${e(K.sebep)}</div>` : ''}
     <p class="soluk kucuk">Bu haftanın limitlerinden kısıldı. Dağılımı − / + ile değiştir (100'er ₺).</p>
     <div class="kart">${Object.entries(K.limitler).map(([id, limit]) => {
@@ -953,7 +967,7 @@ function kismaCiz() {
         <span class="pm"><button data-eylem="kisma-eksi" data-id="${e(id)}" aria-label="Azalt">−</button><span class="serif">${para(x)}</span><button data-eylem="kisma-arti" data-id="${e(id)}" aria-label="Artır">+</button></span></div>`;
     }).join('')}
       <div class="dagit-satir"><span class="soluk">Kısılan</span><span class="${tamam ? 'altin' : 'uyari'}">${para(kisilan)} / ${para(K.toplam)}${tamam ? ' ✓' : ''}</span></div></div>
-    <button class="btn ana tam" data-eylem="kisma-onayla"${tamam ? '' : ' disabled'}>Planı onayla</button>`;
+    <button class="btn ana tam" data-eylem="kisma-onayla"${tamam ? '' : ' disabled'}>Planı onayla</button>`);
 }
 
 function kismaDegistir(id, yon) {
@@ -1768,7 +1782,7 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.6';
+const SURUM = '1.7';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
@@ -1843,7 +1857,130 @@ const FORMLAR = {
   sihirbaz: sihirbazIleri,
 };
 
+// ================================================================ basılı tutma
+// −/+ basılı tutulunca tekrarlar ve hızlanır. Yapılacaklar'da ödemeye (kart ödemesi hariç: tutarı tahmin)
+// basılı tutmak doğrudan "Ödendi/Yaptım" der; yanlışsa "Geri al". Basılı tutmadan sonra gelen tıklama
+// ≈400 ms içinde yutulur (süresiz bayrak bir sonraki dokunuşu yerdi); parmak 10 px'ten çok oynarsa iptal.
+const TEKRARLI = new Set(['dagitim-arti', 'dagitim-eksi', 'kisma-arti', 'kisma-eksi']);
+let basili = null;
+let tiklamaYut = 0;
+
+function basiliBirak() {
+  if (!basili) return;
+  clearTimeout(basili.zaman);
+  if (basili.oldu) tiklamaYut = Date.now() + 400;
+  basili = null;
+}
+
+async function odemeHizli(id) {
+  const o = D.veri.odemeler.find((x) => x.id === id);
+  if (!o) return;
+  const islemId = `odm:${kimlik()}`;
+  await yazVeCiz(`/odeme/${encodeURIComponent(id)}/yap`, 'POST', { tutar: o.tutar, tarih: bugun(), kaynak_id: o.kaynak_id, islem_id: islemId });
+  bildirim(`${o.ad} · ${o.tur === 'havale' ? 'yapıldı' : 'ödendi'}`, { ad: 'Geri al', fn: () => guvenli(() => yazVeCiz(`/odeme/${encodeURIComponent(id)}/geri`, 'POST', {})) });
+}
+
+document.addEventListener('pointerdown', (ev) => {
+  const el = ev.target.closest('[data-eylem]');
+  if (!el || el.disabled) return;
+  const eylem = el.dataset.eylem;
+  const odeme = eylem === 'odeme' ? D.veri?.odemeler.find((x) => x.id === el.dataset.id) : null;
+  if (!TEKRARLI.has(eylem) && !(odeme && odeme.tur !== 'kart')) return;
+  basiliBirak();
+  const b = { x: ev.clientX, y: ev.clientY, oldu: false };
+  basili = b;
+  if (odeme) {
+    b.zaman = setTimeout(() => { if (basili !== b) return; b.oldu = true; guvenli(() => odemeHizli(odeme.id)); }, 550);
+    return;
+  }
+  let aralik = 180;
+  const adim = () => {
+    if (basili !== b) return;
+    b.oldu = true;
+    EYLEMLER[eylem](el);
+    aralik = Math.max(45, aralik * 0.85);
+    b.zaman = setTimeout(adim, aralik);
+  };
+  b.zaman = setTimeout(adim, 400);
+});
+document.addEventListener('pointermove', (ev) => {
+  if (basili && Math.hypot(ev.clientX - basili.x, ev.clientY - basili.y) > 10) { clearTimeout(basili.zaman); basili = null; }
+});
+for (const t of ['pointerup', 'pointercancel']) document.addEventListener(t, basiliBirak);
+document.addEventListener('contextmenu', (ev) => { if (ev.target.closest('[data-eylem]')) ev.preventDefault(); });
+
+// ================================================================ kaydırma
+// Ay ekranında yatay kaydırma önceki/sonraki aya geçer (parmağı izler; gidecek ay yoksa esneyip döner).
+// Sol kenardan sağa çekmek geri demektir: açık sayfayı kapatır, alt ekrandan (hareketler, sabitler,
+// kategoriler) üst ekrana döner. Ana ekrana eklenmiş uygulamada iOS'un kendi geri hareketi yok.
+const ALT_EKRAN_USTU = { hareketler: 'ozet', sabitler: 'ay', kategoriler: 'ayarlar' };
+let kayma = null;
+
+function kaymaHedefi() {
+  return kayma.tur === 'sayfa' ? $('#katman .sayfa') : $('#uyg');
+}
+
+document.addEventListener('touchstart', (ev) => {
+  kayma = null;
+  if (ev.touches.length !== 1) return;
+  const { clientX: x, clientY: y } = ev.touches[0];
+  const sayfaAcik = !!$('#katman .sayfa');
+  let tur = null;
+  if (x < 24 && sayfaAcik) tur = 'sayfa';
+  else if (x < 24 && ALT_EKRAN_USTU[D.ekran]) tur = 'geri';
+  else if (!sayfaAcik && D.ekran === 'ay' && D.veri && !ev.target.closest('input, select, textarea, details')) tur = 'ay';
+  if (tur) kayma = { tur, x, y, t: Date.now(), yatay: null, dx: 0 };
+}, { passive: true });
+
+document.addEventListener('touchmove', (ev) => {
+  if (!kayma) return;
+  const { clientX, clientY } = ev.touches[0];
+  const dx = clientX - kayma.x;
+  const dy = clientY - kayma.y;
+  if (kayma.yatay === null) {
+    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
+    kayma.yatay = Math.abs(dx) > Math.abs(dy);
+    if (!kayma.yatay) { kayma = null; return; }
+  }
+  ev.preventDefault();
+  let gorunen = dx;
+  if (kayma.tur !== 'ay') gorunen = Math.max(0, dx); // geri yalnız sağa
+  else if ((dx > 0 && $('[data-eylem="ay-onceki"]')?.disabled)) gorunen = dx * 0.3; // gidecek ay yok: esner
+  kayma.dx = dx;
+  const h = kaymaHedefi();
+  if (h) { h.style.transition = 'none'; h.style.transform = `translateX(${gorunen}px)`; }
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (!kayma || !kayma.yatay) { kayma = null; return; }
+  const { tur, dx, t } = kayma;
+  const h = kaymaHedefi();
+  kayma = null;
+  const fiske = Math.abs(dx) > 30 && Date.now() - t < 250;
+  const gecti = Math.abs(dx) > Math.min(90, window.innerWidth * 0.25) || fiske;
+  const geriDon = () => { if (h) { h.style.transition = 'transform .2s ease'; h.style.transform = ''; } };
+  if (tur === 'ay') {
+    const eylem = dx < 0 ? 'ay-sonraki' : 'ay-onceki';
+    if (!gecti || $(`[data-eylem="${eylem}"]`)?.disabled) return geriDon();
+    const yon = dx < 0 ? -1 : 1;
+    h.style.transition = 'transform .15s ease';
+    h.style.transform = `translateX(${yon * window.innerWidth}px)`;
+    setTimeout(() => {
+      EYLEMLER[eylem]();
+      h.style.transition = 'none';
+      h.style.transform = `translateX(${-yon * window.innerWidth * 0.4}px)`;
+      requestAnimationFrame(() => { h.style.transition = 'transform .2s ease'; h.style.transform = ''; });
+    }, 150);
+    return;
+  }
+  if (dx < 60 && !fiske) return geriDon();
+  if (tur === 'sayfa') { if (h) { h.style.transition = ''; h.style.transform = ''; } sayfaKapat(); return; }
+  if (h) { h.style.transition = 'none'; h.style.transform = ''; }
+  ekranaGit(ALT_EKRAN_USTU[D.ekran]);
+});
+
 document.addEventListener('click', (ev) => {
+  if (Date.now() < tiklamaYut) { tiklamaYut = 0; ev.preventDefault(); return; }
   const el = ev.target.closest('[data-eylem], [data-ekran]');
   if (!el || el.disabled) return;
   if (el.dataset.ekran) { ev.preventDefault(); sayfaKapat(); return ekranaGit(el.dataset.ekran); }

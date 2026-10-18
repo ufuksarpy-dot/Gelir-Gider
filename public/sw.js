@@ -1,7 +1,7 @@
 // Üretildi: node yayinla.js — elle değiştirme.
 // Uygulama dosyaları önbellekte: internet olmadan da açılır. Veri zaten telefonda (depo.js).
-const ONBELLEK = 'usy-463a1e51db38';
-const KABUK = ["./","index.html","app.js","hesap.js","depo.js","yerel-api.js","excel.js","ice-aktar.js","deneme.js","vendor/xlsx.full.min.js","manifest.json","icon-180.png","icon-192.png","icon-512.png"];
+const ONBELLEK = 'usy-a7e329e2bb7f';
+const KABUK = ["./","index.html","app.js","hesap.js","depo.js","yerel-api.js","excel.js","ice-aktar.js","deneme.js","vendor/morphdom.js","vendor/xlsx.full.min.js","manifest.json","icon-180.png","icon-192.png","icon-512.png"];
 
 self.addEventListener('install', (e) => {
   // cache: 'reload' — tarayıcının kendi önbelleğindeki eski dosyayı alma (GitHub Pages 10 dk önbellekletir)
