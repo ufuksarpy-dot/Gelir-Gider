@@ -500,20 +500,22 @@ function ozetCiz() {
   // Tepede kullanılabilir bakiye (banka hesapları + nakit); altta net varlık, yatırım, kart borcu.
   const { yatirim: yatirimToplam, hesaplar: nakit, kartBorcu } = H.varlikDagilimi(v);
   const bekleyenYatirim = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.hedef_id && o.hedef_id === a.yatirim_hesabi).reduce((t, o) => t + o.tutar, 0);
-  let alt = '';
-  if (yat?.buAy > 0) alt = `<div class="iyi kucuk">▲ ${para(yat.buAy)} bu ay yatırıma ayrıldı</div>`;
-  else if (bekleyenYatirim > 0) alt = `<div class="soluk kucuk">${para(bekleyenYatirim)} yatırıma gönderilmeyi bekliyor</div>`;
+  // Sade: büyük rakamın altında tek gri satır; alt satırda ₺ tekrar etmez; yatırım bilgisi en altta tek satır.
+  const sayi = (k) => para(k).replace(' ₺', '');
+  const yatirimSatiri = [
+    yat?.buAy > 0 ? `Bu ay yatırıma ${para(yat.buAy)}` : bekleyenYatirim > 0 ? `${para(bekleyenYatirim)} yatırıma gönderilecek` : '',
+    yat?.buYil > 0 ? `bu yıl ${para(yat.buYil)}` : '',
+  ].filter(Boolean).join(' · ');
   html += `<section class="hero">
     <div class="etiket-k">Kullanılabilir bakiye</div>
     <div class="buyuk">${paraParca(nakit)}</div>
-    <div class="soluk kucuk">${hesaplar.filter((h) => h.tur !== 'kart' && h.tur !== 'yatirim' && h.id !== a.yatirim_hesabi).map((h) => `${e(h.ad)} ${para(b.get(h.id) || 0).replace(' ₺', '')}`).join(' · ')}</div>
-    ${kartBorcu < 0 ? `<div class="altin kucuk" style="margin-top:2px">Kart borcu ödenince ${para(nakit + kartBorcu)}</div>` : ''}${alt}
-    <div class="ucluk" style="margin-top:12px">
-      <div><div class="etiket-k">Net varlık</div><div class="serif">${para(H.netVarlik(v), { tam: true })}</div></div>
-      <div><div class="etiket-k">Yatırım</div><div class="serif">${para(yatirimToplam, { tam: true })}</div></div>
-      <div><div class="etiket-k">Kart borcu</div><div class="serif ${kartBorcu < 0 ? 'uyari' : ''}">${para(kartBorcu, { tam: true })}</div></div>
+    ${kartBorcu < 0 ? `<div class="soluk" style="font-size:13px;margin-top:4px">Kart borcu ödenince ${para(nakit + kartBorcu)}</div>` : ''}
+    <div class="ucluk" style="margin-top:22px;padding-top:14px;border-top:0.5px solid var(--cerceve)">
+      <div><div class="etiket-k">Net varlık</div><div class="serif">${sayi(H.netVarlik(v))}</div></div>
+      <div><div class="etiket-k">Yatırım</div><div class="serif">${sayi(yatirimToplam)}</div></div>
+      <div><div class="etiket-k">Kart borcu</div><div class="serif">${sayi(kartBorcu)}</div></div>
     </div>
-    ${yat && yat.buYil > 0 ? `<div class="soluk kucuk" style="margin-top:10px">Bu yıl yatırıma ${para(yat.buYil, { tam: true })}${yat.seri > 1 ? ` · ${yat.seri} ay üst üste` : ''}</div>` : ''}
+    ${yatirimSatiri ? `<div class="soluk kucuk" style="margin-top:14px">${yatirimSatiri.charAt(0).toUpperCase() + yatirimSatiri.slice(1)}</div>` : ''}
   </section>`;
 
   if (maas.sor) {
@@ -1756,7 +1758,7 @@ function sihirbazEylem(eylem, el) {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.4';
+const SURUM = '1.5';
 
 const EYLEMLER = {
   kapat: () => sayfaKapat(),
