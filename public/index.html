@@ -184,9 +184,17 @@ details.kova > summary::-webkit-details-marker { display: none; }
 .ucluk { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .ucluk .serif { font-size: 16px; margin-top: 2px; }
 .buyuk-orta { font-family: var(--serif); font-size: 26px; color: var(--ana); font-variant-numeric: lining-nums tabular-nums; }
+.buyuk-orta.kotu { color: var(--kotu); }
 .ayrac { border-top: 0.5px solid var(--cizgi); margin-top: 12px; padding-top: 10px; }
 .bag { background: none; border: 0; padding: 8px 0 0; font-size: 13px; text-align: left; }
 .altin { color: var(--ana); }
+.hafta-kaydir { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 0 16px; scroll-padding: 0 16px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.hafta-kaydir::-webkit-scrollbar { display: none; }
+.hafta-sayfa { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; margin-bottom: 0; }
+.noktalar { display: flex; justify-content: center; gap: 6px; margin: 8px 0 10px; }
+.noktalar span { width: 5px; height: 5px; border-radius: 50%; background: var(--cerceve); transition: background .2s; }
+.noktalar span.secili { background: var(--ana); }
+.ay-sonundan-btn { margin-top: 14px; color: var(--ana); border-color: var(--ana); background: none; }
 .uyari-kart { border-color: #6b4a2a; }
 label.bag { display: block; text-align: center; cursor: pointer; }
 .pm { display: inline-flex; align-items: center; gap: 10px; }

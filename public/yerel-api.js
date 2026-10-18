@@ -26,8 +26,9 @@ const SATIRLAR = {
 };
 
 // kisma: { pazartesi: { kategori_id: kuruş } } · artan_aktarim: [{ id, tarih, tutar, gelir_id }] (bkz. hesap.js › artanButce)
+// ay_sonundan: { pazartesi: 1 } — o haftanın açığı ay sonundan düşülür, sonraki hafta kısılmaz.
 export function bosBelge() {
-  const b = { surum: 1, ayar: {}, kisma: {}, artan_aktarim: [] };
+  const b = { surum: 1, ayar: {}, kisma: {}, artan_aktarim: [], ay_sonundan: {} };
   for (const t of Object.keys(SATIRLAR)) b[t] = [];
   return b;
 }
@@ -73,6 +74,7 @@ function veriYukle(B) {
     ayPlanlari: sirala(B.ay_plani, 'ay', 'kova', 'kalem'),
     kismalar: B.kisma || {},
     artanAktarimlari: B.artan_aktarim || [],
+    aySonundan: B.ay_sonundan || {},
   };
 }
 
@@ -463,6 +465,25 @@ function kismaDegistir(B, pzt, govde) {
   return { tamam: true };
 }
 
+// "Ay sonundan düş": yalnız bu bütçe ayının bugüne kadarki haftaları; kapanmış hafta da değişebilir.
+// Sürmekte olan haftanın kısması yeniden hesaplanır (açık ay sonuna gidince kısma kalkar, geri alınınca döner).
+function aySonundanDegistir(B, pzt, govde, gun) {
+  const ayar = H.ayarBirlestir(B.ayar);
+  const buHafta = H.pazartesi(gun);
+  if (pzt !== H.pazartesi(pzt) || pzt > buHafta || H.haftaAyi(pzt, ayar) !== H.haftaAyi(buHafta, ayar)) throw new ApiHata(409, 'Bu hafta değiştirilemez');
+  B.ay_sonundan ||= {};
+  if (govde.acik) B.ay_sonundan[pzt] = 1;
+  else delete B.ay_sonundan[pzt];
+  B.kisma ||= {};
+  if (!B.hafta.some((h) => h.pazartesi === buHafta)) {
+    const yeni = H.buHaftaKismasi(veriYukle(B), gun);
+    const toplamT = (o) => Object.values(o || {}).reduce((t, x) => t + x, 0);
+    if (!toplamT(yeni)) delete B.kisma[buHafta];
+    else if (toplamT(yeni) !== toplamT(B.kisma[buHafta])) B.kisma[buHafta] = yeni; // aynı toplamda kullanıcının dağılımı kalır
+  }
+  return { tamam: true };
+}
+
 // İçe aktarma: hepsi doğrulanır, sonra hepsi birden eklenir (biri hatalıysa hiçbiri). Aynı kimlik varsa atlanır.
 function iceAktar(B, govde) {
   const liste = Array.isArray(govde.islemler) ? govde.islemler : [];
@@ -529,6 +550,7 @@ function yonlendir(B, yol, yontem, govde, gun) {
   if (yol === '/ayar' && yontem === 'PUT') return ayarGuncelle(B, govde);
 
   if ((m = yol.match(/^\/kisma\/(\d{4}-\d{2}-\d{2})$/)) && yontem === 'PUT') return kismaDegistir(B, m[1], govde);
+  if ((m = yol.match(/^\/hafta\/(\d{4}-\d{2}-\d{2})\/ay-sonundan$/)) && yontem === 'PUT') return aySonundanDegistir(B, m[1], govde, gun);
   if (yol === '/yedek-alindi' && yontem === 'POST') { B.ayar.son_yedek = gun; return { tamam: true }; }
   if (yol === '/ice-aktar' && yontem === 'POST') return iceAktar(B, govde);
   if (yol === '/ice-aktar/geri' && yontem === 'POST') {

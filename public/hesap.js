@@ -158,6 +158,11 @@ export function ayHaftalari(ay, ayar) {
   return sonuc;
 }
 
+// Haftanın, ait olduğu bütçe ayındaki sırası (1'den). Kurulum ayında ilk hafta kurulum haftasıdır.
+export function haftaNo(pzt, ayar) {
+  return ayHaftalari(haftaAyi(pzt, ayar), ayar).indexOf(pzt) + 1;
+}
+
 // Kurulum haftasında yalnız kalan günler sayılır.
 export function haftaOrani(pzt, ayar) {
   const k = ayar?.kurulum_tarihi;
@@ -461,16 +466,36 @@ export function haftaKapanisi(veri, pzt) {
 // Artan bütçe = kapanan haftaların farkları (o haftaya yazılan kısma geri eklenerek, çünkü kısma
 // eski bir açığın ödenmesidir) − artan bütçeden yapılan harcamalar − maaş günü yatırıma aktarılanlar.
 // Artıysa harcanabilir; eksiyse sonraki haftanın limitleri kısılır; maaş günü yatırım tutarına eklenir/düşülür.
+// "Ay sonundan düş" işaretli haftanın açığı artan bütçeye yazılmaz (sonraki haftayı kısmaz, yatırımdan
+// düşmez): para zaten harcandı, yalnız ay sonunda hesapta kalan azalır. Artısı yine artan bütçeye gider.
 export function artanButce(veri) {
   let t = 0;
   for (const h of veri.haftalar || []) {
     const k = veri.kismalar?.[h.pazartesi];
-    t += Number(h.fark) + (k ? toplam(Object.values(k), Number) : 0);
+    const fark = Number(h.fark);
+    t += (veri.aySonundan?.[h.pazartesi] ? Math.max(0, fark) : fark) + (k ? toplam(Object.values(k), Number) : 0);
   }
   for (const i of canli(veri.islemler)) if (i.tur === 'gider' && !i.aile && i.kategori_id === ARTAN_KATEGORI) t -= butcePayi(i);
   t -= Number(veri.artanEskiHarcama) || 0; // telefona gönderilmeyen eski harcamalar (yerel-api)
   for (const a of veri.artanAktarimlari || []) t -= Number(a.tutar);
   return t;
+}
+
+// Bu haftanın kısması: kapanan haftalardan kalan açık (eksi artan bütçe). "Ay sonundan düş" değişince yeniden hesaplanır.
+export function buHaftaKismasi(veri, gun) {
+  const artan = artanButce(veri);
+  return artan < 0 ? kismaDagit(veri, pazartesi(gun), -artan) : {};
+}
+
+// Haftanın açığı (limitin üstünde harcanan, net): kapanmışsa dondurulmuş fark, sürüyorsa şimdiki kalan.
+export function haftaAcigi(veri, pzt, gun) {
+  return Math.max(0, -haftaDurumu(veri, pzt, gun).fark);
+}
+
+// Bütçe ayında "ay sonundan düş" işaretli haftaların açıkları toplamı (ay sonu tahmini dökümünde gösterilir).
+export function aySonundanDusulen(veri, ay, gun) {
+  const ayar = ayarBirlestir(veri.ayar);
+  return toplam(ayHaftalari(ay, ayar).filter((p) => veri.aySonundan?.[p] && p <= pazartesi(gun)), (p) => haftaAcigi(veri, p, gun));
 }
 
 // Açığı haftalık kategorilere limitleriyle orantılı paylaştırır (tam lira; küsurat en büyük limite).
@@ -862,7 +887,7 @@ export function aySonuTahmini(veri, gun) {
   const havale = toplam((veri.odemeler || []).filter((o) => o.durum === 'bekliyor' && o.tur === 'havale' && o.vade <= son && banka.has(o.kaynak_id) && o.hedef_id && !banka.has(o.hedef_id)), (o) => o.tutar);
   ekle('Yatırıma gidecek havaleler', -havale);
 
-  return { ay, son, tutar: toplam(kalemler, (x) => x.tutar), kalemler };
+  return { ay, son, tutar: toplam(kalemler, (x) => x.tutar), kalemler, aySonundan: aySonundanDusulen(veri, ay, gun) };
 }
 
 // Son n bütçe ayının sonundaki net varlık (bu ay için bugün). Kurulumdan öncesi yok.

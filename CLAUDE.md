@@ -30,7 +30,7 @@ kullanıcının rakamları ve ilerleme notu depo DIŞINDA (`..\DEVAM-NOTU.md`) d
 
 Para düzeni: gelir havuzu yok (eski havuz/şelale kodu eski kurulumlar için duruyor). Maaşta
 `gelirDagitimi` (ayın planı kalır, `yatirim_tutari` ± artan bütçe yatırıma). Haftalık fark
-`artanButce`'ye; eksiye düşünce `kismaDagit` sonraki haftayı kısar. `aile` işaretli gider/sabit
+`artanButce`'ye; eksiye düşünce `kismaDagit` sonraki haftayı kısar; `aySonundan[pzt]` işaretli haftanın açığı sayılmaz (`/hafta/:pzt/ay-sonundan`). `aile` işaretli gider/sabit
 bütçeye girmez → `aileAlacagi`. `ARTAN_KATEGORI = 'artan-butce'` sanal kategori.
 
 ## Kurallar

@@ -32,10 +32,10 @@
 
 | Bölüm | Ne işe yarar |
 |---|---|
-| **Özet** | Tepede **kullanılabilir bakiye** (banka hesapları + nakit) ve **ay sonu tahmini** (dokununca döküm); altında net varlık · yatırım · kart borcu (geçen bütçe ayının sonuna göre ↑/↓). Yeni bütçe ayının ilk 5 günü geçen ayın **özet kartı** (yatırıma giden, plana göre, en çok harcanan 3 kategori; × ile kapanır). Bu haftanın bütçesi ("günde X ₺"), artan bütçe, maaş/aile kartları, 14 günlük yapılacaklar, son hareketler. |
+| **Özet** | Tepede **kullanılabilir bakiye** (banka hesapları + nakit) ve **ay sonu tahmini** (dokununca döküm); altında net varlık · yatırım · kart borcu (geçen bütçe ayının sonuna göre ↑/↓). Yeni bütçe ayının ilk 5 günü geçen ayın **özet kartı** (yatırıma giden, plana göre, en çok harcanan 3 kategori; × ile kapanır). Haftalık kart (sağa sola kaydırılır: bu bütçe ayının haftaları, "Ekim · 2. hafta"; açılışta bu hafta, altta noktalar; geçmiş haftada harcanan ve farkın nereye gittiği, gelecek haftada limitler ve kısılacak tutar; "günde X ₺"), artan bütçe, maaş/aile kartları, 14 günlük yapılacaklar, son hareketler. |
 | **Dokunma** | Yapılacaklar'da ödemeye **basılı tut** = Ödendi/Yaptım (kart ödemesi hariç; "Geri al"). −/+ basılı tutulunca hızlanır. Ay ekranında yatay kaydırma = önceki/sonraki ay. **Sol kenardan sağa çek** = geri. Formlardaki tutar kutuları telefon klavyesi yerine uygulamanın tuş takımını açar. Hafta bütçenin altında kapanınca ve maaşta yatırım ayrılınca kısa ✦ kutlama. |
 | **Hızlı kayıt** | **Yeni kayıt** → tutarı tuşla → kategoriye dokun = kaydedildi (5 sn "Geri al"). Hesap/kart seçimi (son kullanılan önce gelir), taksit, plan dışı, "Ailem ödüyor", not ve tarih. Gelir ve hesaplar arası transfer de buradan. |
-| **Haftalık bütçe** | Kategori başına haftalık limit; hafta pazartesi–pazar. Hafta kapanınca her kategorinin farkı (artı ya da eksi) **Artan bütçe**'ye gider. Artan bütçe eksiye düşerse sonraki haftanın limitleri **kısılır** (limitlere oranla; ekranda ± ile değiştirilebilir). |
+| **Haftalık bütçe** | Kategori başına haftalık limit; hafta pazartesi–pazar. Hafta kapanınca her kategorinin farkı (artı ya da eksi) **Artan bütçe**'ye gider. Artan bütçe eksiye düşerse sonraki haftanın limitleri **kısılır** (limitlere oranla; ekranda ± ile değiştirilebilir). Açık olan haftada **"Açığı ay sonundan düş"**: o haftanın açığı artan bütçeye yazılmaz, sonraki hafta kısılmaz, yatırımdan düşmez; yalnız ay sonunda elde kalan azalır. Bu ayın geçmiş haftalarında da açılıp kapatılabilir. |
 | **Ay planı** | Bütçe ayı 10'undan ertesi ayın 9'una. **Gider grupları**: sabit ödemeler (+ kart taksit payları) · haftalık bütçeler · aylık harcamalar · beklenmeyen payı · iş giderleri (boş grup gizlenir). Plan / gerçekleşen yan yana, haftalar listesi. |
 | **Maaş** | Beklenen maaş ayarlarda. Özet'te "Maaş geldi mi?" → **maaş dağıtımı**: ayın giderleri hesapta kalır, **aylık yatırım** (ayarlardaki tutar ± artan bütçe; ekranda −/+) yatırıma havale olur, kalanı serbest. |
 | **Ailem ödüyor** | Böyle işaretlenen harcama/sabit ödeme bütçeye girmez, kart borcuna girer ve **aileden alacak** olur; aile ödeyince "Geldi" ile kapanır (gelir sayılmaz). |
@@ -50,7 +50,7 @@
 
 ### Bütçe ayı (10'undan 9'una)
 - **Bütçe ayı** = ayın 10'u → ertesi ayın 9'u. Adını başladığı aydan alır: *10 Ekim – 9 Kasım = "Ekim"*. Maaş birkaç gün erken yatarsa da o ayın geliridir.
-- **Hafta**, perşembesinin düştüğü bütçe ayına aittir (bazı aylarda 5 hafta).
+- **Hafta**, perşembesinin düştüğü bütçe ayına aittir (bazı aylarda 5 hafta). "1. hafta": 10'u pazartesi–perşembeyse içinde 10'u olan hafta, cuma–pazarsa ertesi pazartesi başlayan hafta.
 - **Sabit ödeme**, vadesinin düştüğü bütçe ayına yazılır (ayın 5'inde ödenen bir önceki bütçe ayındandır).
 - **Kurulum ayı**: başlangıç günü → ilk 9'u. İlk hafta ve aylık limitler kalan günlere göre orantılanır (ör. salı başlanırsa ilk hafta limitin 6/7'si).
 - **Geçmiş başlangıç**: kurulumda en çok 60 gün geriye gidilebilir; bakiyeler o günün bakiyesidir, o günden bu yana olanlar sonradan girilir ya da içe aktarılır.
@@ -62,7 +62,7 @@
 - **Taksit**: ilk pay alışveriş günü kategorisinden düşer, sonraki paylar düştükleri bütçe ayının sabit ödemelerine yazılır.
 - **Plan dışı** işaretli harcama beklenmeyen payından düşer. **İş gideri** işaretli kategori kişisel bütçeye karışmaz.
 - **Dondurma**: kapanan haftanın limit ve harcaması donar; ayın planı ay başında donar. Bir kategori ya da sabit ödeme değişirse **içinde bulunulan ayın ve sonrasının** planı yeniden hesaplanır; geçmiş aylar değişmez.
-- **Ay sonu tahmini** (bütçe ayının son günü, maaştan önce): kullanılabilir bakiye − kart borcu + aileden alacak − kalan sabit ödemeler − haftalık ve aylık limitlerin kalanı (aşılan kategori 0, limitsiz kategori bir şey eklemez) − beklenmeyen payının kalanı − yatırıma bekleyen havaleler.
+- **Ay sonu tahmini** (bütçe ayının son günü, maaştan önce): kullanılabilir bakiye − kart borcu + aileden alacak − kalan sabit ödemeler − haftalık ve aylık limitlerin kalanı (aşılan kategori 0, limitsiz kategori bir şey eklemez) − beklenmeyen payının kalanı − yatırıma bekleyen havaleler. Dökümün altında "İçinde ay sonundan düşülen açıklar" gösterilir.
 - **Kart son ödemesi** (ekstre okuyucu gelene kadar): kesim günü geçince dönem harcamaları "tahmini" ödeme olarak çıkar; **Ödendi** derken bankanın istediği tutar yazılır.
 - **Yatırım** değeri bakiye kontrolüyle elle güncellenir; uygulama fiyat çekmez, yatırım önerisi vermez.
 

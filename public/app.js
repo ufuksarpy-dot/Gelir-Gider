@@ -199,6 +199,7 @@ async function basla() {
 
 function anaEkran() {
   D.pin = null;
+  D.haftaGoster = null; // açılışta bugünün haftası
   $('#menu').hidden = false;
   if (!D.ay) D.ay = H.butceAyi(bugun(), ayar());
   ciz();
@@ -218,12 +219,14 @@ function ciz() {
   if (!D.veri) return;
   const ekranlar = { ozet: ozetCiz, ay: ayCiz, cuzdan: cuzdanCiz, ayarlar: ayarlarCiz, hareketler: hareketlerCiz, sabitler: sabitlerCiz, kategoriler: kategorilerCiz };
   yerlestir($('#uyg'), (ekranlar[D.ekran] || ozetCiz)());
+  if (D.ekran === 'ozet') haftaKonumla();
   const ana = { hareketler: 'ozet', sabitler: 'ay', kategoriler: 'ayarlar' }[D.ekran] || D.ekran;
   for (const b of $$('#menu [data-ekran]')) b.classList.toggle('secili', b.dataset.ekran === ana);
 }
 
 function ekranaGit(ekran) {
   D.ekran = ekran;
+  if (ekran === 'ozet') D.haftaGoster = null;
   ciz();
   window.scrollTo(0, 0);
 }
@@ -586,14 +589,7 @@ function ozetCiz() {
 
   html += yedekHatirlatmasi(a, gun);
 
-  const kalanRenk = hafta.kalan < 0 ? 'kotu' : '';
-  html += `<div class="kart">
-    <div class="ikili"><span class="etiket-k">Bu hafta günde</span><span class="buyuk-orta ${kalanRenk}">${para(hafta.gunluk)}</span></div>
-    <div class="soluk kucuk">kalan <b class="sayi ${kalanRenk}">${para(hafta.kalan)}</b> / ${para(hafta.limit)} · ${hafta.kalanGun} gün</div>
-    ${hafta.satirlar.map((s) => kategoriCubugu(s)).join('')}
-    <div class="ikili ayrac"><span>${e(H.ARTAN_AD)}</span><span class="serif ${artan > 0 ? 'iyi' : artan < 0 ? 'uyari' : 'soluk'}">${para(artan, { isaret: true })}</span></div>
-    ${kisma && kismaToplam ? `<button class="bag uyari" data-eylem="kisma">Bu hafta ${para(kismaToplam)} kısıldı · dağılımı gör</button>` : ''}
-  </div>`;
+  html += haftaKartlari(v, gun, hafta, artan, kisma ? kismaToplam : 0);
 
   // Kategori aşımı çubuklarda görünüyor; burada yalnız diğer uyarılar (aynı bilgi iki kez gösterilmez).
   for (const d of dikkat.filter((x) => x.tur !== 'asim')) html += `<div class="dikkat${d.tur === 'kart' ? ' kotu' : ''}">${e(d.metin)}</div>`;
@@ -642,6 +638,123 @@ function ayMetni(x) {
   if (x == null || !isFinite(x)) return '—';
   if (x < 1) return `${Math.max(0, Math.round(x * 30))} gün`;
   return `${x.toFixed(1).replace('.', ',')} ay`;
+}
+
+// ================================================================ haftalık kart
+// Bu bütçe ayının haftaları yan yana; sağa sola kaydırılır, açılışta bugünün haftası. Geçmiş hafta: harcanan,
+// çubuklar, farkın nereye gittiği. Gelecek: limitler (bu haftanın açığı kısılacaksa tahmini). Açık olan
+// haftada "Açığı ay sonundan düş" (H.artanButce; kapanmış haftada da değiştirilebilir).
+
+function haftaAraligi(pzt) {
+  const son = H.ekleGun(pzt, 6);
+  return pzt.slice(5, 7) === son.slice(5, 7) ? `${Number(pzt.slice(8, 10))}–${H.tarihYaz(son)}` : `${H.tarihYaz(pzt)} – ${H.tarihYaz(son)}`;
+}
+
+function haftaKartlari(v, gun, hafta, artan, kismaToplam) {
+  const a = ayar();
+  const buHafta = H.pazartesi(gun);
+  const ay = H.haftaAyi(buHafta, a);
+  const haftalar = H.ayHaftalari(ay, a);
+  if (!haftalar.includes(buHafta)) haftalar.push(buHafta);
+  const ayAdi = H.ayAdi(ay).split(' ')[0];
+  const sayfalar = haftalar.map((p, i) => {
+    const bas = `<div class="ikili kucuk" style="margin-bottom:10px"><span class="altin">${e(ayAdi)} · ${i + 1}. hafta</span>
+      <span class="soluk">${e(haftaAraligi(p))} · ${p === buHafta ? 'bu hafta' : p < buHafta ? 'kapandı' : 'henüz başlamadı'}</span></div>`;
+    let ic;
+    if (p === buHafta) ic = buHaftaIcerigi(v, hafta, artan, kismaToplam);
+    else if (p < buHafta) ic = gecmisHaftaIcerigi(v, p, gun);
+    else ic = gelecekHaftaIcerigi(v, p, gun, hafta);
+    return `<div class="kart hafta-sayfa" data-pzt="${p}">${bas}${ic}${p <= buHafta ? aySonundanDugmesi(v, p, gun) : ''}</div>`;
+  });
+  const sira = Math.max(0, haftalar.indexOf(D.haftaGoster || buHafta));
+  return `<div class="hafta-kaydir" id="hafta-kaydir">${sayfalar.join('')}</div>
+    ${haftalar.length > 1 ? `<div class="noktalar">${haftalar.map((p, i) => `<span class="${i === sira ? 'secili' : ''}"></span>`).join('')}</div>` : ''}`;
+}
+
+function buHaftaIcerigi(v, hafta, artan, kismaToplam) {
+  const kalanRenk = hafta.kalan < 0 ? 'kotu' : '';
+  return `<div class="ikili"><span class="etiket-k">Bu hafta günde</span><span class="buyuk-orta ${kalanRenk}">${para(hafta.gunluk)}</span></div>
+    <div class="soluk kucuk">kalan <b class="sayi ${kalanRenk}">${para(hafta.kalan)}</b> / ${para(hafta.limit)} · ${hafta.kalanGun} gün</div>
+    ${hafta.satirlar.map((s) => kategoriCubugu(s)).join('')}
+    <div class="ikili ayrac"><span>${e(H.ARTAN_AD)}</span><span class="serif ${artan > 0 ? 'iyi' : artan < 0 ? 'uyari' : 'soluk'}">${para(artan, { isaret: true })}</span></div>
+    ${kismaToplam ? `<button class="bag uyari" data-eylem="kisma">Bu hafta ${para(kismaToplam)} kısıldı · dağılımı gör</button>` : ''}`;
+}
+
+function gecmisHaftaIcerigi(v, p, gun) {
+  const h = H.haftaDurumu(v, p, gun);
+  const sonraki = v.kismalar?.[H.ekleGun(p, 7)];
+  let alt;
+  if (h.fark >= 0) alt = `<span>Artan bütçeye</span><span class="serif iyi">${para(h.fark, { isaret: true })}</span>`;
+  else if (v.aySonundan?.[p]) alt = `<span>Ay sonundan düşüldü</span><span class="serif uyari">${para(h.fark)}</span>`;
+  else alt = `<span>${sonraki ? 'Sonraki haftadan kısıldı' : 'Artan bütçeden karşılandı'}</span><span class="serif uyari">${para(h.fark)}</span>`;
+  return `<div class="ikili"><span class="etiket-k">Harcanan</span><span class="buyuk-orta ${h.fark < 0 ? 'kotu' : ''}">${para(h.harcanan)}</span></div>
+    <div class="soluk kucuk">limit ${para(h.limit)}</div>
+    ${h.satirlar.map((s) => kategoriCubugu(s)).join('')}
+    <div class="ikili ayrac">${alt}</div>`;
+}
+
+// Gelecek hafta: limitler. Bu haftanın açığı (ay sonundan düşülmeyecekse) yalnız sonraki haftadan kısılır: tahmini gösterilir.
+function gelecekHaftaIcerigi(v, p, gun, hafta) {
+  const limitler = H.haftaLimitleri(v, p);
+  let kisma = {};
+  if (p === H.ekleGun(hafta.pazartesi, 7)) {
+    const buKisma = Object.values(v.kismalar?.[hafta.pazartesi] || {}).reduce((t, x) => t + x, 0);
+    const fark = v.aySonundan?.[hafta.pazartesi] ? Math.max(0, hafta.kalan) : hafta.kalan;
+    const tahmini = H.artanButce(v) + fark + buKisma;
+    if (tahmini < 0) kisma = H.kismaDagit(v, p, -tahmini);
+  }
+  const kisilan = Object.values(kisma).reduce((t, x) => t + x, 0);
+  const toplamLimit = Object.values(limitler).reduce((t, x) => t + x, 0) - kisilan;
+  const satirlar = Object.entries(limitler).map(([id, l]) => {
+    const k = kategori(id);
+    const x = kisma[id] || 0;
+    return `<div class="ikili kucuk" style="margin-top:10px"><span>${e(k?.simge || '')} ${e(k?.ad || '?')}</span>
+      <span class="sayi">${para(l - x)}${x ? ` <span class="soluk">(${para(l)})</span>` : ''}</span></div>`;
+  }).join('');
+  return `<div class="ikili"><span class="etiket-k">Limit</span><span class="buyuk-orta">${para(toplamLimit)}</span></div>
+    ${satirlar}
+    ${kisilan ? `<div class="ikili ayrac"><span>Bu haftanın açığından kısılacak</span><span class="serif uyari">−${para(kisilan)}</span></div>` : ''}`;
+}
+
+function aySonundanDugmesi(v, p, gun) {
+  const acik = H.haftaAcigi(v, p, gun);
+  if (!acik) return '';
+  const kapandi = p < H.pazartesi(gun);
+  if (v.aySonundan?.[p]) {
+    return `<div class="ikili" style="margin-top:12px"><span class="altin kucuk">${kapandi ? 'Açık ay sonundan düşüldü' : 'Açık ay sonundan düşülecek'} ✓</span>
+      <button class="bag" style="padding:0" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="0">Geri al</button></div>`;
+  }
+  return `<button class="btn tam ay-sonundan-btn" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="1">Açığı ay sonundan düş</button>
+    <div class="soluk kucuk" style="text-align:center;margin-top:6px">${!kapandi ? 'Sonraki hafta kısılmaz' : v.kismalar?.[H.pazartesi(gun)] && H.ekleGun(p, 7) === H.pazartesi(gun) ? 'Bu haftanın kısması kalkar' : 'Artan bütçeye geri eklenir'} · ${para(acik)} ay sonundan karşılanır</div>`;
+}
+
+async function aySonundanDegistir(pzt, acik) {
+  await yazVeCiz(`/hafta/${pzt}/ay-sonundan`, 'PUT', { acik });
+  bildirim(acik ? 'Açık ay sonundan düşülecek' : 'Açık yine artan bütçeden karşılanacak', { ad: 'Geri al', fn: () => guvenli(() => yazVeCiz(`/hafta/${pzt}/ay-sonundan`, 'PUT', { acik: !acik })) });
+}
+
+// Kaydırınca noktalar ve hatırlanan hafta güncellenir; çizimden sonra kart hatırlanan haftaya getirilir.
+function haftaSirasi(k) {
+  const n = k.children.length;
+  return n ? Math.max(0, Math.min(n - 1, Math.round(k.scrollLeft / (k.scrollWidth / n)))) : 0;
+}
+
+document.addEventListener('scroll', (ev) => {
+  const k = ev.target;
+  if (!(k instanceof Element) || k.id !== 'hafta-kaydir') return;
+  const i = haftaSirasi(k);
+  D.haftaGoster = k.children[i]?.dataset.pzt || null;
+  $$('.noktalar span').forEach((n, j) => n.classList.toggle('secili', j === i));
+}, true);
+
+function haftaKonumla() {
+  const k = $('#hafta-kaydir');
+  if (!k) return;
+  const sayfalar = [...k.children];
+  const hedef = sayfalar.find((c) => c.dataset.pzt === D.haftaGoster) || sayfalar.find((c) => c.dataset.pzt === H.pazartesi(bugun()));
+  if (!hedef) return;
+  const x = hedef.offsetLeft - sayfalar[0].offsetLeft;
+  if (Math.abs(k.scrollLeft - x) > 2) k.scrollLeft = x;
 }
 
 function kategoriCubugu(s) {
@@ -1865,13 +1978,14 @@ function tahminAc() {
   sayfaAc(`${sayfaBaslik('Ay sonu tahmini')}
     <div class="bilgi kucuk">${e(H.tarihYaz(t.son, true))}, maaştan önceki gün: kart borçları ödenmiş ve bu ayın kalan limitleri harcanmış sayılırsa elinde kalan. Limiti aşılan kategori 0 sayılır; ailenin ödediği taksit hem borç hem alacak olduğu için hesaba girmez.</div>
     <div class="kart ince">${t.kalemler.map((k) => `<div class="satir"><span class="ad">${e(k.ad)}</span><span class="tutar">${para(k.tutar, { isaret: true })}</span></div>`).join('')}
-      <div class="satir"><span class="ad"><b>Ay sonu tahmini</b></span><span class="tutar"><b>${para(t.tutar)}</b></span></div></div>`);
+      <div class="satir"><span class="ad"><b>Ay sonu tahmini</b></span><span class="tutar"><b>${para(t.tutar)}</b></span></div></div>
+    ${t.aySonundan ? `<div class="soluk kucuk" style="text-align:center">İçinde ay sonundan düşülen açıklar: ${para(t.aySonundan)}</div>` : ''}`);
 }
 
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.9';
+const SURUM = '1.10';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
@@ -1905,6 +2019,7 @@ const EYLEMLER = {
   'dagitim-eksi': () => dagitimDegistir(-1),
   'dagitim-onayla': () => guvenli(dagitimOnayla),
   kisma: () => kismaAc(),
+  'ay-sonundan': (el) => guvenli(() => aySonundanDegistir(el.dataset.pzt, el.dataset.acik === '1')),
   'kisma-arti': (el) => kismaDegistir(el.dataset.id, 1),
   'kisma-eksi': (el) => kismaDegistir(el.dataset.id, -1),
   'kisma-onayla': () => guvenli(kismaOnayla),
