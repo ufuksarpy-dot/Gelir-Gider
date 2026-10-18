@@ -835,11 +835,15 @@ const TUSLAR = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'sil'];
 function tusluAc(inp) {
   for (const x of $$('.tuslu-aktif')) x.classList.remove('tuslu-aktif');
   inp.classList.add('tuslu-aktif');
+  $('.tus-panel')?.remove();
+  // Açık sayfada sayfanın altına (yapışık); ana ekranda/sihirbazda kutunun satırının hemen altına (alttaki menü örtmesin)
   const s = inp.closest('.sayfa');
-  if (s && !$('.tus-panel', s)) {
-    s.insertAdjacentHTML('beforeend', `<div class="tus-panel"><div class="tus-takimi">${TUSLAR.map((t) => `<button type="button" data-eylem="tt" data-t="${t}">${t === 'sil' ? '⌫' : t}</button>`).join('')}</div>
-      <button type="button" class="btn tam" data-eylem="tt-kapat">Tamam</button></div>`);
-  }
+  const tuslar = `<div class="tus-panel${s ? '' : ' yerinde'}"><div class="tus-takimi">${TUSLAR.map((t) => `<button type="button" data-eylem="tt" data-t="${t}">${t === 'sil' ? '⌫' : t}</button>`).join('')}</div>
+      <button type="button" class="btn tam" data-eylem="tt-kapat">Tamam</button></div>`;
+  if (s) s.insertAdjacentHTML('beforeend', tuslar);
+  else (inp.closest('.yan') || inp.closest('label') || inp).insertAdjacentHTML('afterend', tuslar);
+  // Yazılan kutu tuş takımının arkasında kalmasın
+  requestAnimationFrame(() => inp.scrollIntoView({ block: 'center', behavior: 'smooth' }));
 }
 
 function tusluTus(t) {
@@ -847,6 +851,7 @@ function tusluTus(t) {
   if (!inp) return;
   const ham = tusUygula(inp.value.replace(/\./g, ''), t);
   inp.value = ham ? tutarGoster(ham) : '';
+  inp.dispatchEvent(new Event('input', { bubbles: true })); // canlı toplamlar (ör. dağıtım payları) güncellensin
 }
 
 function tusluKapat() {
@@ -918,7 +923,7 @@ function selaGor() {
   const hedefler = aktif(D.veri.hedefler);
   const varsayilanHedef = hedefler.find((h) => h.hafta_farki)?.id || hedefler[0]?.id || '';
   const satir = (ad, ad2, alan, deger, hesap) => `<label class="alan"><span>${ad} <span class="soluk">${hesap ? `→ ${e(hesapAdi(hesap))}` : ad2}</span></span>
-    <input inputmode="decimal" data-pay="${alan}" value="${e(kurusMetin(deger))}"></label>`;
+    <input ${TUSLU} data-pay="${alan}" value="${e(kurusMetin(deger))}"></label>`;
   D.sela = { islem: { id: kimlik(), tarih: g.tarih || bugun(), tur: 'gelir', tutar, hedef_id: g.gelirHesap, gelir_kaynagi: g.kaynak, notu: g.notu || null, taksit: 1 } };
   sayfaAc(`${sayfaBaslik(`${g.kaynak} · ${para(tutar)}`)}
     <p class="soluk kucuk">Havuz şu an ${para(hv.bakiye)}, hedef ${para(hv.hedef)}. Önce havuz dolar; artan %${a.sela.birikim} birikim · %${a.sela.yatirim} yatırım · %${a.sela.serbest} serbest bölünür. Paylar düzenlenebilir.</p>
@@ -1287,9 +1292,9 @@ function hesapDuzenle(id) {
 function hesapEkAlanlari(h, yeni) {
   const kart = h.tur === 'kart';
   let html = '';
-  if (yeni) html += `<label class="alan"><span>${kart ? 'Bugünkü borç' : 'Bugünkü bakiye'}</span><input name="acilis" inputmode="decimal" placeholder="0"></label>`;
+  if (yeni) html += `<label class="alan"><span>${kart ? 'Bugünkü borç' : 'Bugünkü bakiye'}</span><input name="acilis" ${TUSLU} placeholder="0"></label>`;
   if (kart) {
-    html += `<label class="alan"><span>Limit</span><input name="limit_tutar" inputmode="decimal" value="${e(kurusMetin(h.limit_tutar))}"></label>
+    html += `<label class="alan"><span>Limit</span><input name="limit_tutar" ${TUSLU} value="${e(kurusMetin(h.limit_tutar))}"></label>
       <div class="yan"><label class="alan"><span>Kesim günü</span><input name="kesim_gunu" type="number" min="1" max="31" value="${e(h.kesim_gunu ?? '')}"></label>
       <label class="alan"><span>Son ödeme günü</span><input name="son_odeme_gunu" type="number" min="1" max="31" value="${e(h.son_odeme_gunu ?? '')}"></label></div>
       <label class="alan"><span>Ödendiği hesap</span><select name="odeme_hesap_id">${hesapSecenekleri((x) => x.tur === 'vadesiz' || x.tur === 'nakit', h.odeme_hesap_id, 'Harcama hesabı')}</select></label>`;
@@ -1332,7 +1337,7 @@ function hedefDuzenle(id) {
   sayfaAc(`${sayfaBaslik(id ? 'Hedefi düzenle' : 'Yeni hedef')}
     <form data-form="hedef" data-id="${e(id || '')}">
       <label class="alan"><span>Ad</span><input name="ad" value="${e(h.ad)}" maxlength="40" required></label>
-      <label class="alan"><span>Hedef tutar</span><input name="hedef_tutar" inputmode="decimal" value="${e(kurusMetin(h.hedef_tutar || ''))}"></label>
+      <label class="alan"><span>Hedef tutar</span><input name="hedef_tutar" ${TUSLU} value="${e(kurusMetin(h.hedef_tutar || ''))}"></label>
       <label class="alan"><span>Hesap</span><select name="hesap_id">${hesapSecenekleri((x) => x.tur !== 'kart', h.hesap_id, '—')}</select></label>
       <label class="anahtar"><span>Hafta farkı buraya</span><input type="checkbox" name="hafta_farki" ${h.hafta_farki ? 'checked' : ''}></label>
       <div class="btnlar">${id ? `<button type="button" class="btn tehlike" data-eylem="hedef-kaldir" data-id="${e(id)}">Kaldır</button>` : ''}<button class="btn ana">Kaydet</button></div>
@@ -1451,9 +1456,9 @@ function ayarlarCiz() {
     </div>
     <form data-form="ayar">
       <h2>Para akışı</h2><div class="kart">
-        <div class="yan"><label class="alan"><span>Beklenen net maaş</span><input name="maas" inputmode="decimal" value="${e(kurusMetin(a.maas.tutar))}"></label>
-        <label class="alan"><span>Aylık yatırım</span><input name="yatirim_tutari" inputmode="decimal" value="${e(kurusMetin(a.yatirim_tutari))}"></label></div>
-        <label class="alan"><span>Beklenmeyen payı (ay)</span><input name="beklenmeyen" inputmode="decimal" value="${e(kurusMetin(a.beklenmeyen))}"></label>
+        <div class="yan"><label class="alan"><span>Beklenen net maaş</span><input name="maas" ${TUSLU} value="${e(kurusMetin(a.maas.tutar))}"></label>
+        <label class="alan"><span>Aylık yatırım</span><input name="yatirim_tutari" ${TUSLU} value="${e(kurusMetin(a.yatirim_tutari))}"></label></div>
+        <label class="alan"><span>Beklenmeyen payı (ay)</span><input name="beklenmeyen" ${TUSLU} value="${e(kurusMetin(a.beklenmeyen))}"></label>
         ${a.havuz_hesabi ? `<label class="alan"><span>Havuz hedefi: kaç aylık ihtiyaç</span><input name="havuz_ay" type="number" min="0" max="24" step="0.5" value="${e(a.havuz_ay)}"></label>
         <div class="soluk kucuk" style="margin:0 4px 6px">Şelale (toplam 100): birikim · yatırım · serbest</div>
         <div class="yan"><input name="sela_birikim" type="number" min="0" max="100" value="${a.sela.birikim}"><input name="sela_yatirim" type="number" min="0" max="100" value="${a.sela.yatirim}"><input name="sela_serbest" type="number" min="0" max="100" value="${a.sela.serbest}"></div>` : ''}
@@ -1611,7 +1616,7 @@ function sAdimGelir(S) {
     <div class="kart">
       <label class="alan"><span>Başlangıç günü (en çok 60 gün geriye)</span>${sGirdi('baslangic', S.baslangic, `type="date" min="${H.ekleGun(bugun(), -60)}" max="${bugun()}"`)}</label>
       <p class="soluk kucuk" style="margin-top:-6px">Geçmiş bir gün seçersen bakiyeleri o günkü hâliyle yaz; o günden bu yana harcamalar sonradan eklenir.</p>
-      <label class="alan"><span>Beklenen net maaş</span>${sGirdi('maas', S.maas, 'inputmode="decimal" placeholder="0"')}</label>
+      <label class="alan"><span>Beklenen net maaş</span>${sGirdi('maas', S.maas, `${TUSLU} placeholder="0"`)}</label>
       <label class="alan"><span>Gelir kaynakları (virgülle; düzensiz ek gelirler için)</span>${sGirdi('kaynaklar', S.kaynaklar)}</label>
       <p class="soluk kucuk">Maaş gelince o ayın giderleri hesapta kalır, aylık yatırım tutarı yatırıma havale olur, kalanı serbesttir.</p>
     </div>
@@ -1624,8 +1629,8 @@ function sAdimHesaplar(S) {
     const odemeHesaplari = S.hesaplar.filter((x) => x.tur === 'vadesiz' || x.tur === 'nakit');
     return `<div class="kart"><div class="ikili"><b>${e(H.HESAP_TURLERI[h.tur])}</b><button type="button" class="kucuk-btn" data-eylem="s-sil" data-liste="hesaplar" data-i="${i}">Kaldır</button></div>
       <div class="yan" style="margin-top:8px"><label class="alan"><span>Ad</span>${sGirdi(`h${i}_ad`, h.ad, 'maxlength="40" required')}</label>
-      <label class="alan"><span>${kart ? 'Borç' : 'Bakiye'} (${e(H.tarihYaz(S.baslangic || bugun()))})</span>${sGirdi(`h${i}_bakiye`, h.bakiye, 'inputmode="decimal" placeholder="0"')}</label></div>
-      ${kart ? `<div class="yan"><label class="alan"><span>Limit</span>${sGirdi(`h${i}_limit`, h.limit, 'inputmode="decimal"')}</label>
+      <label class="alan"><span>${kart ? 'Borç' : 'Bakiye'} (${e(H.tarihYaz(S.baslangic || bugun()))})</span>${sGirdi(`h${i}_bakiye`, h.bakiye, `${TUSLU} placeholder="0"`)}</label></div>
+      ${kart ? `<div class="yan"><label class="alan"><span>Limit</span>${sGirdi(`h${i}_limit`, h.limit, TUSLU)}</label>
         <label class="alan"><span>Kesim günü</span>${sGirdi(`h${i}_kesim`, h.kesim, 'type="number" min="1" max="31"')}</label>
         <label class="alan"><span>Son ödeme</span>${sGirdi(`h${i}_sonodeme`, h.sonodeme, 'type="number" min="1" max="31"')}</label></div>
         <div class="yan"><label class="alan"><span>Ödendiği hesap</span><select name="h${i}_odeme">${secenekler(odemeHesaplari.map((x) => [x.id, x.ad || HESAP_SABLONLARI[x.tur]]), h.odeme, 'Harcama hesabı')}</select></label>
@@ -1652,10 +1657,10 @@ function sAdimKategoriler(S) {
       ${sGirdi(`k${i}_simge`, k.simge, 'style="flex:0 0 52px;text-align:center" maxlength="8"')}
       ${sGirdi(`k${i}_ad`, k.ad, 'maxlength="30" required')}
       <select name="k${i}_tur" style="flex:0 0 104px">${secenekler([['haftalik', 'Haftalık'], ['aylik', k.is_gideri ? 'Aylık · iş' : 'Aylık']], k.tur)}</select>
-      ${sGirdi(`k${i}_limit`, k.limit, 'inputmode="decimal" placeholder="Limit" style="flex:0 0 92px"')}
+      ${sGirdi(`k${i}_limit`, k.limit, `${TUSLU} placeholder="Limit" style="flex:0 0 92px"`)}
       <button type="button" class="kapat" style="flex:0 0 32px" data-eylem="s-sil" data-liste="kategoriler" data-i="${i}">×</button></div>`).join('')}
       <button type="button" class="kucuk-btn" data-eylem="s-kategori-ekle">+ Kategori</button></div>
-    <div class="kart"><label class="alan"><span>Beklenmeyen payı (aylık; plan dışı harcamalar buradan)</span>${sGirdi('beklenmeyen', S.beklenmeyen, 'inputmode="decimal" placeholder="0"')}</label></div>`;
+    <div class="kart"><label class="alan"><span>Beklenmeyen payı (aylık; plan dışı harcamalar buradan)</span>${sGirdi('beklenmeyen', S.beklenmeyen, `${TUSLU} placeholder="0"`)}</label></div>`;
 }
 
 function sAdimSabitler(S) {
@@ -1663,7 +1668,7 @@ function sAdimSabitler(S) {
   return `<div class="bilgi kucuk">Kira, aidat, faturalar, abonelikler, kredi taksiti. Faturalar için ortalama tutarı yaz ve "değişken" işaretle. Karttan kendiliğinden çekilen abonelik "otomatik"tir.</div>
     ${S.sabitler.map((s, i) => `<div class="kart"><div class="ikili"><b>${e(s.ad || 'Sabit ödeme')}</b><button type="button" class="kucuk-btn" data-eylem="s-sil" data-liste="sabitler" data-i="${i}">Kaldır</button></div>
       <div class="yan" style="margin-top:8px"><label class="alan"><span>Ad</span>${sGirdi(`s${i}_ad`, s.ad, 'maxlength="40" required')}</label>
-      <label class="alan"><span>Tutar</span>${sGirdi(`s${i}_tutar`, s.tutar, 'inputmode="decimal" required')}</label></div>
+      <label class="alan"><span>Tutar</span>${sGirdi(`s${i}_tutar`, s.tutar, `${TUSLU} required`)}</label></div>
       <div class="yan"><label class="alan"><span>Ayın kaçı</span>${sGirdi(`s${i}_gun`, s.gun, 'type="number" min="1" max="31" required')}</label>
       <label class="alan"><span>Periyot</span><select name="s${i}_periyot">${secenekler(PERIYOTLAR, s.periyot || 1)}</select></label></div>
       <div class="yan"><label class="alan"><span>Hesap</span><select name="s${i}_hesap">${secenekler(hesaplar, s.hesap || S.roller.harcama)}</select></label>
@@ -1681,7 +1686,7 @@ function sAdimSabitler(S) {
 function sAdimYatirim(S) {
   return `<div class="bilgi kucuk">Her maaşta bu ayın giderleri hesapta kalır; buradaki tutar yatırıma havale olur. Haftalardan artan para (artan bütçe) ay sonunda bu tutara eklenir, eksikse düşülür. Maaş günü ekranda değiştirebilirsin.</div>
     <div class="kart">
-      <label class="alan"><span>Aylık yatırım</span>${sGirdi('yatirim', S.yatirim, 'inputmode="decimal" placeholder="0"')}</label>
+      <label class="alan"><span>Aylık yatırım</span>${sGirdi('yatirim', S.yatirim, `${TUSLU} placeholder="0"`)}</label>
       ${S.roller.yatirim ? '' : '<p class="uyari kucuk">Yatırım hesabı seçilmedi (Hesaplar adımı): havale oluşmaz.</p>'}
     </div>`;
 }
@@ -1866,7 +1871,7 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.8';
+const SURUM = '1.9';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
