@@ -136,8 +136,12 @@ function bildirim(metin, eylem, { kutlama = false } = {}) {
 let swKayitli = false;
 
 // Çevrimdışı çalışma + otomatik güncelleme. Yeni sürüm etkinleşince sayfa bir kez yenilenir (yoksa telefon
-// eski kodu açık tutar); ilk kurulumda (henüz denetleyen yokken) yenileme yok. iPhone uygulamayı çoğu zaman
-// arkada tuttuğu için öne gelince de yeni sürüme bakılır. Yenilenince PIN yeniden sorulur.
+// eski kodu açık tutar); ilk kurulumda (henüz denetleyen yokken) yenileme yok. Yeni sürüm açılışta, öne
+// gelişte ve uygulama açıkken 5 dakikada bir aranır; sw.js tarayıcı önbelleğinden okunmaz (updateViaCache).
+// Yenilenince PIN yeniden sorulur ve "Uygulama güncellendi" bildirimi çıkar (bayrak sessionStorage'da, veri yok).
+let swKayit = null;
+const GUNCELLEME_ARALIGI = 5 * 60e3;
+
 function swKaydet() {
   if (swKayitli || !('serviceWorker' in navigator)) return;
   swKayitli = true;
@@ -146,13 +150,32 @@ function swKaydet() {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       if (yenilendi) return;
       yenilendi = true;
+      try { sessionStorage.setItem('usy_guncellendi', '1'); } catch {}
       location.reload();
     });
   }
-  navigator.serviceWorker.register('sw.js').then((k) => {
-    k.update();
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((k) => {
+    swKayit = k;
+    k.update().catch(() => {});
     document.addEventListener('visibilitychange', () => { if (!document.hidden) k.update().catch(() => {}); });
+    setInterval(() => { if (!document.hidden) k.update().catch(() => {}); }, GUNCELLEME_ARALIGI);
   }).catch(() => {});
+}
+
+function guncellendiBildir() {
+  let var_ = false;
+  try { var_ = sessionStorage.getItem('usy_guncellendi') === '1'; sessionStorage.removeItem('usy_guncellendi'); } catch {}
+  if (var_) bildirim(`Uygulama güncellendi · v${SURUM}`, null, { kutlama: true });
+}
+
+// Ayarlar › sürüm: elle "yeni sürüm var mı" (varsa iner, bitince sayfa kendiliğinden yenilenir).
+async function guncellemeDenetle() {
+  const k = swKayit || (await navigator.serviceWorker?.getRegistration());
+  if (!k) return bildirim(`v${SURUM}`);
+  bildirim('Yeni sürüm aranıyor…');
+  try { await k.update(); } catch { return bildirim('İnternet yok; sonra tekrar dene'); }
+  if (k.installing || k.waiting) bildirim('Yeni sürüm iniyor; birazdan uygulama yenilenecek');
+  else bildirim(`Güncel · v${SURUM}`);
 }
 
 async function basla() {
@@ -171,6 +194,7 @@ async function basla() {
   if (!d.kurulum) return guvenli(sihirbazAc);
   try { await yenile(); } catch (err) { return hataGoster(err); }
   anaEkran();
+  guncellendiBildir();
 }
 
 function anaEkran() {
@@ -1419,7 +1443,7 @@ function ayarlarCiz() {
   const kat = aktif(v.kategoriler);
   const haftalik = kat.filter((k) => k.tur === 'haftalik' && !k.is_gideri).reduce((t, k) => t + k.limit_tutar, 0);
   const rol = (ad, alan, deger, filtre) => `<label class="alan"><span>${ad}</span><select name="${alan}">${hesapSecenekleri(filtre, deger, '—')}</select></label>`;
-  return `<header class="ust"><h1>Ayarlar</h1><small>v${e(SURUM)}</small></header>
+  return `<header class="ust"><h1>Ayarlar</h1><button class="kucuk-btn" data-eylem="guncelle-denetle">v${e(SURUM)} · güncelle</button></header>
     <div class="kart ince">
       <button class="satir" data-ekran="kategoriler"><span class="simge">🏷️</span><span class="ad"><b>Kategoriler ve limitler</b><span>Haftalık toplam ${para(haftalik)}</span></span><span class="soluk">›</span></button>
       <button class="satir" data-ekran="sabitler"><span class="simge">📄</span><span class="ad"><b>Sabit ödemeler</b><span>${aktif(v.sabitler).length} kalem</span></span><span class="soluk">›</span></button>
@@ -1842,10 +1866,11 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.7';
+const SURUM = '1.8';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
+  'guncelle-denetle': () => guvenli(guncellemeDenetle),
   'ozet-kapat': (el) => guvenli(() => yazVeCiz('/ayar', 'PUT', { ozet_kapandi: el.dataset.ay })),
   tt: (el) => tusluTus(el.dataset.t),
   'tt-kapat': () => tusluKapat(),
