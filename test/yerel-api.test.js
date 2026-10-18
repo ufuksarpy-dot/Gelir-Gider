@@ -221,12 +221,12 @@ test('19 Eki pazartesi: geçen hafta kapandı, aşım artan bütçeye; bu haftan
   assert.equal(H.haftaDurumu(await veri(), '2026-10-12', gun).fark, -40000);
 });
 
-test('Ekim planı dondu: limit değişince geçmiş ay bozulmaz', async () => {
+test('Ekim planı: içindeyken limit değişince bu ayın planı yeniden hesaplanır', async () => {
   const once = H.ayPlani(await veri(), '2026-10').plan;
   assert.equal((await iste('/kategori/kat-market', { yontem: 'PUT', govde: { ad: 'Market', simge: '🛒', tur: 'haftalik', limit_tutar: 175000 } })).durum, 200);
   const v = await veri();
-  assert.equal(H.ayPlani(v, '2026-10').plan, once);
-  assert.equal(H.ayPlani(v, '2026-10').donmus, true);
+  assert.notEqual(H.ayPlani(v, '2026-10').plan, once);
+  assert.equal(H.ayPlani(v, '2026-10').donmus, false); // ertesi günkü bakımda yeniden donar
 });
 
 test('10 Kas: yeni bütçe ayı, çekiş havalesi; Ekim haftaları kapandı', async () => {

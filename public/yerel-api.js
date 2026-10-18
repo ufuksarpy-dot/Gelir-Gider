@@ -232,9 +232,18 @@ function islemTemizle(g) {
 
 // ---------------------------------------------------------------- kayıtlar
 
-function kayitYaz(B, tur, id, govde) {
+// Kategori ya da sabit ödeme değişince bu bütçe ayının ve sonrasının dondurulmuş planı silinir:
+// plan canlı hesaplanır, ertesi günkü bakımda yeni hâliyle yeniden dondurulur. Geçmiş aylar değişmez.
+function planiCoz(B, tur, gun) {
+  if (!gun || !['kategori', 'sabit'].includes(tur) || !B.ayar.kurulum_tarihi) return;
+  const ay = H.butceAyi(gun, B.ayar);
+  B.ay_plani = B.ay_plani.filter((x) => x.ay < ay);
+}
+
+function kayitYaz(B, tur, id, govde, gun) {
   const kayit = TABLOLAR[tur].temizle(id, govde);
   upsert(B, tur, kayit);
+  planiCoz(B, tur, gun);
   // Bekleyen sabit ödemeler yeni tutarı/hesabı alsın.
   if (tur === 'sabit') {
     for (const o of B.odeme) {
@@ -245,9 +254,10 @@ function kayitYaz(B, tur, id, govde) {
   return { tamam: true, kayit };
 }
 
-function kayitKaldir(B, tur, id) {
+function kayitKaldir(B, tur, id, gun) {
   const k = B[TABLOLAR[tur].tablo].find((x) => x.id === id);
   if (k) k.aktif = 0;
+  planiCoz(B, tur, gun);
   if (tur === 'sabit') B.odeme = B.odeme.filter((o) => !(o.tur === 'sabit' && o.ref_id === id && o.durum === 'bekliyor'));
   return { tamam: true };
 }
@@ -510,8 +520,8 @@ function yonlendir(B, yol, yontem, govde, gun) {
   if ((m = yol.match(/^\/odeme\/([\w:.-]+)\/(yap|atla|geri)$/)) && yontem === 'POST') return odemeIslemi(B, m[1], m[2], govde, gun);
   if ((m = yol.match(/^\/hesap\/([\w-]+)\/esitle$/)) && yontem === 'POST') return hesapEsitle(B, m[1], govde, gun);
   if ((m = yol.match(/^\/(hesap|kategori|hedef|sabit)\/([\w-]+)$/))) {
-    if (yontem === 'PUT') return kayitYaz(B, m[1], m[2], govde);
-    if (yontem === 'DELETE') return kayitKaldir(B, m[1], m[2]);
+    if (yontem === 'PUT') return kayitYaz(B, m[1], m[2], govde, gun);
+    if (yontem === 'DELETE') return kayitKaldir(B, m[1], m[2], gun);
   }
   if (yol === '/ayar' && yontem === 'PUT') return ayarGuncelle(B, govde);
 

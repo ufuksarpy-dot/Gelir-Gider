@@ -225,3 +225,29 @@ test('geçmiş başlangıç: başlangıçla bugün arasındaki sabit vade oluşu
   v = await api2.istek('/veri');
   assert.deepEqual(v.odemeler.filter((o) => o.ref_id === 's-tek').map((o) => o.vade), ['2026-11-10']);
 });
+
+test('kategori değişince bu ayın dondurulmuş planı yeniden hesaplanır; geçmiş ay değişmez', async () => {
+  const g = { gun: '2026-10-18' };
+  const api3 = yerelApi(bellekDeposu(), { bugun: () => g.gun });
+  await api3.istek('/kurulum', { yontem: 'POST', govde: {
+    baslangic: '2026-10-13',
+    ayar: { ay_baslangic_gunu: 10, maas: { tutar: 5000000, hesap_id: 'v-2222' }, harcama_hesabi: 'v-2222' },
+    hesaplar: [{ id: 'v-2222', ad: 'Deneme vadesiz', tur: 'vadesiz', acilis_bakiye: 1000000 }],
+    kategoriler: [{ id: 'k-yakit', ad: 'Yakıt', tur: 'haftalik', limit_tutar: 100000 }],
+  } });
+  let v = await api3.istek('/veri');
+  assert.ok(H.ayPlani(v, '2026-10').donmus);
+  assert.ok(H.ayPlani(v, '2026-10').kovalar.find((k) => k.id === 'haftalik').plan > 0);
+  await api3.istek('/kategori/k-yakit', { yontem: 'PUT', govde: { ad: 'Yakıt', tur: 'aylik', limit_tutar: 400000 } });
+  v = await api3.istek('/veri');
+  const p = H.ayPlani(v, '2026-10');
+  assert.equal(p.kovalar.find((k) => k.id === 'haftalik')?.plan || 0, 0);
+  assert.ok(p.kovalar.find((k) => k.id === 'aylik').plan > 0);
+  g.gun = '2026-11-12'; // Ekim geçti: Kasım'da yapılan değişiklik Ekim planına dokunmaz
+  v = await api3.istek('/veri');
+  const ekim = H.ayPlani(v, '2026-10').plan;
+  await api3.istek('/kategori/k-yakit', { yontem: 'PUT', govde: { ad: 'Yakıt', tur: 'aylik', limit_tutar: 900000 } });
+  v = await api3.istek('/veri');
+  assert.equal(H.ayPlani(v, '2026-10').plan, ekim);
+  assert.equal(H.ayPlani(v, '2026-11').kovalar.find((k) => k.id === 'aylik').plan, 900000);
+});
