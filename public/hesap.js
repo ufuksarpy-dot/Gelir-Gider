@@ -487,6 +487,18 @@ export function buHaftaKismasi(veri, gun) {
   return artan < 0 ? kismaDagit(veri, pazartesi(gun), -artan) : {};
 }
 
+// Bu haftanın açığından sonraki haftaya yazılacak kısmanın tahmini (hafta kapanınca bakım yazar; bkz. bakimAdimlari 3b).
+// "Ay sonundan düş" işaretliyse açık sayılmaz.
+export function sonrakiHaftaKismasi(veri, gun) {
+  const pzt = pazartesi(gun);
+  const h = haftaDurumu(veri, pzt, gun);
+  if (h.kapali) return {};
+  const buKisma = toplam(Object.values(veri.kismalar?.[pzt] || {}), Number);
+  const fark = veri.aySonundan?.[pzt] ? Math.max(0, h.kalan) : h.kalan;
+  const t = artanButce(veri) + fark + buKisma;
+  return t < 0 ? kismaDagit(veri, ekleGun(pzt, 7), -t) : {};
+}
+
 // Haftanın açığı (limitin üstünde harcanan, net): kapanmışsa dondurulmuş fark, sürüyorsa şimdiki kalan.
 export function haftaAcigi(veri, pzt, gun) {
   return Math.max(0, -haftaDurumu(veri, pzt, gun).fark);
@@ -858,12 +870,14 @@ export function aySonuTahmini(veri, gun) {
   }
   ekle('Kalan sabit ödemeler', -sabit);
 
+  // Sonraki hafta bu haftanın açığı kadar kısılacaksa o kadar az harcanır ("ay sonundan düş" seçilmişse kısılmaz).
   let haftalik = 0;
   const buHafta = pazartesi(gun);
+  const sonrakiKisma = toplam(Object.values(sonrakiHaftaKismasi(veri, gun)));
   for (const p of ayHaftalari(ay, ayar)) {
     if (p < buHafta) continue;
     if (p === buHafta) haftalik += toplam(haftaDurumu(veri, p, gun).satirlar, (s) => Math.max(0, s.kalan));
-    else haftalik += toplam(Object.values(haftaLimitleri(veri, p)));
+    else haftalik += toplam(Object.values(haftaLimitleri(veri, p))) - (p === ekleGun(buHafta, 7) ? sonrakiKisma : 0);
   }
   ekle('Kalan haftalık bütçeler', -haftalik);
 

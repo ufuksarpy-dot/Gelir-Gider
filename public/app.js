@@ -696,13 +696,7 @@ function gecmisHaftaIcerigi(v, p, gun) {
 // Gelecek hafta: limitler. Bu haftanın açığı (ay sonundan düşülmeyecekse) yalnız sonraki haftadan kısılır: tahmini gösterilir.
 function gelecekHaftaIcerigi(v, p, gun, hafta) {
   const limitler = H.haftaLimitleri(v, p);
-  let kisma = {};
-  if (p === H.ekleGun(hafta.pazartesi, 7)) {
-    const buKisma = Object.values(v.kismalar?.[hafta.pazartesi] || {}).reduce((t, x) => t + x, 0);
-    const fark = v.aySonundan?.[hafta.pazartesi] ? Math.max(0, hafta.kalan) : hafta.kalan;
-    const tahmini = H.artanButce(v) + fark + buKisma;
-    if (tahmini < 0) kisma = H.kismaDagit(v, p, -tahmini);
-  }
+  const kisma = p === H.ekleGun(hafta.pazartesi, 7) ? H.sonrakiHaftaKismasi(v, gun) : {};
   const kisilan = Object.values(kisma).reduce((t, x) => t + x, 0);
   const toplamLimit = Object.values(limitler).reduce((t, x) => t + x, 0) - kisilan;
   const satirlar = Object.entries(limitler).map(([id, l]) => {
@@ -720,17 +714,18 @@ function aySonundanDugmesi(v, p, gun) {
   const acik = H.haftaAcigi(v, p, gun);
   if (!acik) return '';
   const kapandi = p < H.pazartesi(gun);
+  // Aç/kapa düğmesi: yanıyorsa açık ay sonundan düşülüyor; yeniden dokunmak geri alır.
   if (v.aySonundan?.[p]) {
-    return `<div class="ikili" style="margin-top:12px"><span class="altin kucuk">${kapandi ? 'Açık ay sonundan düşüldü' : 'Açık ay sonundan düşülecek'} ✓</span>
-      <button class="bag" style="padding:0" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="0">Geri al</button></div>`;
+    return `<button class="btn tam ay-sonundan-btn yanik" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="0" aria-pressed="true">${kapandi ? 'Açık ay sonundan düşüldü' : 'Açık ay sonundan düşülecek'} ✓</button>
+    <div class="soluk kucuk" style="text-align:center;margin-top:6px">${para(acik)} ay sonu tahmininden düşüldü · geri almak için dokun</div>`;
   }
-  return `<button class="btn tam ay-sonundan-btn" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="1">Açığı ay sonundan düş</button>
+  return `<button class="btn tam ay-sonundan-btn" data-eylem="ay-sonundan" data-pzt="${p}" data-acik="1" aria-pressed="false">Açığı ay sonundan düş</button>
     <div class="soluk kucuk" style="text-align:center;margin-top:6px">${!kapandi ? 'Sonraki hafta kısılmaz' : v.kismalar?.[H.pazartesi(gun)] && H.ekleGun(p, 7) === H.pazartesi(gun) ? 'Bu haftanın kısması kalkar' : 'Artan bütçeye geri eklenir'} · ${para(acik)} ay sonundan karşılanır</div>`;
 }
 
 async function aySonundanDegistir(pzt, acik) {
   await yazVeCiz(`/hafta/${pzt}/ay-sonundan`, 'PUT', { acik });
-  bildirim(acik ? 'Açık ay sonundan düşülecek' : 'Açık yine artan bütçeden karşılanacak', { ad: 'Geri al', fn: () => guvenli(() => yazVeCiz(`/hafta/${pzt}/ay-sonundan`, 'PUT', { acik: !acik })) });
+  bildirim(acik ? 'Açık ay sonundan düşülecek' : 'Açık yine sonraki haftadan kısılacak');
 }
 
 // Kaydırınca noktalar ve hatırlanan hafta güncellenir; çizimden sonra kart hatırlanan haftaya getirilir.
@@ -1985,7 +1980,7 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.10';
+const SURUM = '1.11';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
