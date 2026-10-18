@@ -2,8 +2,8 @@
 
 Kişisel bütçe uygulaması; iPhone'da Safari › Ana Ekrana Ekle ile kullanılan statik PWA. **Sunucu yok**:
 bütün veri telefonda (IndexedDB), PIN'le şifreli. Bu dosyada kişisel bilgi yoktur ve olmamalıdır;
-kullanıcının rakamları ve ilerleme notu depo DIŞINDA (`..\DEVAM-NOTU.md`) durur. `KURULUM.md` eski
-(Cloudflare) yapıyı anlatır, taşıma bitince yeniden yazılacak.
+kullanıcının rakamları ve ilerleme notu depo DIŞINDA (`..\DEVAM-NOTU.md`) durur. `KURULUM.md` el kitabıdır
+(ne yapar, para kuralları, telefona kurulum, yedek, yayın); yeni özellikte onu da güncelle.
 
 ## Çalışma şekli
 - Kullanıcıyla Türkçe, sade dille konuş; teknik terimi açıkla. Kullanıcı kod yazmıyor.
