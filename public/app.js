@@ -20,7 +20,9 @@ const D = {
 const $ = (s, k = document) => k.querySelector(s);
 const $$ = (s, k = document) => [...k.querySelectorAll(s)];
 const e = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const para = (k, o = {}) => (o.tam ? H.paraYaz(Math.round(k / 100) * 100, { kisa: true, ...o }) : H.paraYaz(k, { kisa: true, ...o }));
+// Ekranda tutarlar tam lira görünür; hesaplar kuruşla yapılır (tuş takımı, düzenleme kutuları ve Excel kuruşlu kalır).
+const tamLira = (k) => Math.sign(k) * Math.round(Math.abs(Number(k) || 0) / 100) * 100;
+const para = (k, o = {}) => H.paraYaz(tamLira(k), { kisa: true, ...o });
 const bugun = () => H.bugun();
 const kimlik = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`);
 const aktif = (l) => (l || []).filter((x) => x.aktif !== 0);
@@ -556,7 +558,7 @@ function ozetCiz() {
 
 // Büyük tutar: kuruşlar küçük, ₺ altın.
 function paraParca(k) {
-  const m = H.paraYaz(k, { kisa: true }).replace(' ₺', '');
+  const m = H.paraYaz(tamLira(k), { kisa: true }).replace(' ₺', '');
   const [tam, kesir] = m.split(',');
   return `${e(tam)}${kesir ? `<span class="kesir">,${e(kesir)}</span>` : ''} <span class="tl">₺</span>`;
 }
@@ -988,6 +990,9 @@ async function aileKaydet(form) {
 
 // ================================================================ AY
 
+// Planı da harcaması da olmayan grup (kullanılmayan beklenmeyen payı, iş giderleri) gösterilmez.
+const doluGrup = (k) => k.plan || k.gercek || k.hareketler?.length;
+
 function ayCiz() {
   const v = D.veri;
   const a = ayar();
@@ -998,12 +1003,12 @@ function ayCiz() {
     <div class="ay-secici"><button data-eylem="ay-onceki" ${ilkAy && D.ay <= ilkAy ? 'disabled' : ''}>‹</button>
       <div><b>${e(p.ad)}</b><div class="soluk kucuk">${e(H.ayAraligiYaz(D.ay, a))}</div></div>
       <button data-eylem="ay-sonraki">›</button></div>
-    <div class="kart"><div class="ikili"><span class="soluk kucuk">Gerçekleşen / plan</span><span class="soluk kucuk">Aylık çekiş = plan</span></div>
+    <div class="kart"><div class="ikili"><span class="soluk kucuk">Gerçekleşen / plan</span></div>
       <div class="ikili"><span class="buyuk sayi">${para(p.gercek)}</span><span class="sayi">/ ${para(p.plan)}</span></div>
       <div class="cubuk ${p.gercek > p.plan ? 'asim' : ''}"><i style="width:${p.plan ? Math.min(100, p.gercek / p.plan * 100).toFixed(1) : 0}%"></i></div>
       <div class="kucuk ${kalan < 0 ? 'kotu' : 'soluk'}" style="margin-top:6px">${kalan >= 0 ? `Plandan ${para(kalan)} kaldı` : `Plan ${para(-kalan)} aşıldı`}</div></div>
-    <h2>Kovalar</h2><div class="kart ince">`;
-  for (const k of p.kovalar) {
+    <h2>Gider grupları</h2><div class="kart ince">`;
+  for (const k of p.kovalar.filter(doluGrup)) {
     const oran = k.plan ? k.gercek / k.plan : k.gercek ? 2 : 0;
     html += `<details class="kova"><summary class="satir"><span class="ad"><b>${e(k.ad)}</b>
       <div class="cubuk ${oran > 1 ? 'asim' : oran > 0.85 ? 'yakin' : ''}"><i style="width:${Math.min(100, oran * 100).toFixed(1)}%"></i></div></span>
@@ -1629,7 +1634,7 @@ function sAdimKontrol(S) {
       <div class="ikili"><span>Bu hafta harcanabilir</span><b class="serif">${para(hafta.limit)}</b></div>
     </div>
     <h2>${e(H.ayAdi(ay))} planı</h2>
-    <div class="kart ince">${p.kovalar.map((k) => `<div class="satir"><span class="ad"><b>${e(k.ad)}</b></span><span class="tutar">${para(k.plan)}</span></div>`).join('')}
+    <div class="kart ince">${p.kovalar.filter(doluGrup).map((k) => `<div class="satir"><span class="ad"><b>${e(k.ad)}</b></span><span class="tutar">${para(k.plan)}</span></div>`).join('')}
       <div class="satir"><span class="ad"><b>Toplam</b></span><span class="tutar">${para(p.plan)}</span></div></div>
     ${kalan < 0 ? '<div class="dikkat">Maaş, giderleri ve yatırımı karşılamıyor.</div>' : ''}`;
 }
@@ -1748,7 +1753,7 @@ function sihirbazEylem(eylem, el) {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.2';
+const SURUM = '1.3';
 
 const EYLEMLER = {
   kapat: () => sayfaKapat(),
