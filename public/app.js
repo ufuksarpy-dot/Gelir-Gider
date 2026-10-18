@@ -483,7 +483,9 @@ function ozetCiz() {
   const maas = H.maasDurumu(v, gun);
   const dikkat = H.dikkatListesi(v, gun);
   const ufuk = H.ekleGun(gun, 14);
-  const yapilacak = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.vade <= ufuk).sort((x, y) => x.vade.localeCompare(y.vade));
+  // Otomatik sabit ödemeler (karttan kendiliğinden çekilir) yapılacaklarda görünmez; vadesinde kendiliğinden işlenir.
+  const otomatik = new Set(aktif(v.sabitler).filter((x) => x.otomatik).map((x) => x.id));
+  const yapilacak = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.vade <= ufuk && !(o.tur === 'sabit' && otomatik.has(o.ref_id))).sort((x, y) => x.vade.localeCompare(y.vade));
   const son = [...v.islemler].sort(hareketSirasi).slice(0, 6);
   const b = H.bakiyeler(v);
   const hesaplar = aktif(v.hesaplar);
@@ -495,19 +497,20 @@ function ozetCiz() {
 
   let html = `<header class="ust"><h1>BANK OF USY</h1><small>${e(H.tarihYaz(gun, true))}</small></header>`;
 
-  // Net varlık: hesaplar + yatırım − kart borcu + aileden alacak
+  // Tepede kullanılabilir bakiye (banka hesapları + nakit); altta net varlık, yatırım, kart borcu.
   const { yatirim: yatirimToplam, hesaplar: nakit, kartBorcu } = H.varlikDagilimi(v);
   const bekleyenYatirim = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.hedef_id && o.hedef_id === a.yatirim_hesabi).reduce((t, o) => t + o.tutar, 0);
   let alt = '';
   if (yat?.buAy > 0) alt = `<div class="iyi kucuk">▲ ${para(yat.buAy)} bu ay yatırıma ayrıldı</div>`;
   else if (bekleyenYatirim > 0) alt = `<div class="soluk kucuk">${para(bekleyenYatirim)} yatırıma gönderilmeyi bekliyor</div>`;
   html += `<section class="hero">
-    <div class="etiket-k">Net varlık</div>
-    <div class="buyuk">${paraParca(H.netVarlik(v))}</div>${alt}
-    ${cizgiGrafik(H.netVarlikSerisi(v, gun).map((x) => x.tutar))}
-    <div class="ucluk">
+    <div class="etiket-k">Kullanılabilir bakiye</div>
+    <div class="buyuk">${paraParca(nakit)}</div>
+    <div class="soluk kucuk">${hesaplar.filter((h) => h.tur !== 'kart' && h.tur !== 'yatirim' && h.id !== a.yatirim_hesabi).map((h) => `${e(h.ad)} ${para(b.get(h.id) || 0).replace(' ₺', '')}`).join(' · ')}</div>
+    ${kartBorcu < 0 ? `<div class="altin kucuk" style="margin-top:2px">Kart borcu ödenince ${para(nakit + kartBorcu)}</div>` : ''}${alt}
+    <div class="ucluk" style="margin-top:12px">
+      <div><div class="etiket-k">Net varlık</div><div class="serif">${para(H.netVarlik(v), { tam: true })}</div></div>
       <div><div class="etiket-k">Yatırım</div><div class="serif">${para(yatirimToplam, { tam: true })}</div></div>
-      <div><div class="etiket-k">Hesaplar</div><div class="serif">${para(nakit, { tam: true })}</div></div>
       <div><div class="etiket-k">Kart borcu</div><div class="serif ${kartBorcu < 0 ? 'uyari' : ''}">${para(kartBorcu, { tam: true })}</div></div>
     </div>
     ${yat && yat.buYil > 0 ? `<div class="soluk kucuk" style="margin-top:10px">Bu yıl yatırıma ${para(yat.buYil, { tam: true })}${yat.seri > 1 ? ` · ${yat.seri} ay üst üste` : ''}</div>` : ''}
@@ -1753,7 +1756,7 @@ function sihirbazEylem(eylem, el) {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.3';
+const SURUM = '1.4';
 
 const EYLEMLER = {
   kapat: () => sayfaKapat(),
