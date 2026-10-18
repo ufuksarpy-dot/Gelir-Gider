@@ -32,7 +32,8 @@
 
 | Bölüm | Ne işe yarar |
 |---|---|
-| **Özet** | Tepede **kullanılabilir bakiye** (banka hesapları + nakit) ve **ay sonu tahmini** (dokununca döküm); altında net varlık · yatırım · kart borcu. Bu haftanın bütçesi ("günde X ₺"), artan bütçe, maaş/aile kartları, 14 günlük yapılacaklar, son hareketler. |
+| **Özet** | Tepede **kullanılabilir bakiye** (banka hesapları + nakit) ve **ay sonu tahmini** (dokununca döküm); altında net varlık · yatırım · kart borcu (geçen bütçe ayının sonuna göre ↑/↓). Yeni bütçe ayının ilk 5 günü geçen ayın **özet kartı** (yatırıma giden, plana göre, en çok harcanan 3 kategori; × ile kapanır). Bu haftanın bütçesi ("günde X ₺"), artan bütçe, maaş/aile kartları, 14 günlük yapılacaklar, son hareketler. |
+| **Dokunma** | Yapılacaklar'da ödemeye **basılı tut** = Ödendi/Yaptım (kart ödemesi hariç; "Geri al"). −/+ basılı tutulunca hızlanır. Ay ekranında yatay kaydırma = önceki/sonraki ay. **Sol kenardan sağa çek** = geri. Formlardaki tutar kutuları telefon klavyesi yerine uygulamanın tuş takımını açar. Hafta bütçenin altında kapanınca ve maaşta yatırım ayrılınca kısa ✦ kutlama. |
 | **Hızlı kayıt** | **Yeni kayıt** → tutarı tuşla → kategoriye dokun = kaydedildi (5 sn "Geri al"). Hesap/kart seçimi (son kullanılan önce gelir), taksit, plan dışı, "Ailem ödüyor", not ve tarih. Gelir ve hesaplar arası transfer de buradan. |
 | **Haftalık bütçe** | Kategori başına haftalık limit; hafta pazartesi–pazar. Hafta kapanınca her kategorinin farkı (artı ya da eksi) **Artan bütçe**'ye gider. Artan bütçe eksiye düşerse sonraki haftanın limitleri **kısılır** (limitlere oranla; ekranda ± ile değiştirilebilir). |
 | **Ay planı** | Bütçe ayı 10'undan ertesi ayın 9'una. **Gider grupları**: sabit ödemeler (+ kart taksit payları) · haftalık bütçeler · aylık harcamalar · beklenmeyen payı · iş giderleri (boş grup gizlenir). Plan / gerçekleşen yan yana, haftalar listesi. |
@@ -114,7 +115,7 @@ telefonda PIN ekranındaki **"Yeni telefon mu? Yedekten geri yükle"** ile yükl
 ## Yeni sürüm yayını (Claude yapar, kullanıcı onaylar)
 
 1. Değişiklik → `npm test` (hepsi geçmeli).
-2. `public/app.js`'teki `SURUM`'u artır (1.6 → 1.7 …) — Ayarlar başlığında görünür.
+2. `public/app.js`'teki `SURUM`'u artır (ör. 1.7 → 1.8) — Ayarlar başlığında görünür.
 3. `node yayinla.js` (sw.js önbellek adı içerikten değişir; yeni dosya eklendiyse `yayinla.js › KABUK` listesine ekle).
 4. Yerelde dene: `node sunucu.js` → http://localhost:8787 (telefon boyutu 375×812; uydurma veri).
 5. Commit → **kullanıcıya sor** → `git push origin main`. GitHub Actions ("Yayın") 1–2 dakikada yayınlar; durumu Actions sekmesinde.

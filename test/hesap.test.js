@@ -325,3 +325,25 @@ test('sabitIlkAy: geçmiş başlangıç gününden sonraki ilk vade; son vadeden
   const taksit = { gun: 3, periyot: 1, ilk_ay: H.sabitIlkAy(3, '2026-10-13'), son_vade: '2027-01-03' };
   assert.deepEqual(H.sabitVadeleri(taksit, '2026-10-13', '2027-12-31'), ['2026-11-03', '2026-12-03', '2027-01-03']);
 });
+
+test('gecenAyaGore: geçen bütçe ayının son gününe göre fark; kurulum ayında null', () => {
+  const v = {
+    ayar: ayar({ kurulum_tarihi: '2026-10-13', yatirim_hesabi: 'y-1' }),
+    hesaplar: [
+      { id: 'vds-1', tur: 'vadesiz', acilis_bakiye: 100000 },
+      { id: 'y-1', tur: 'yatirim', acilis_bakiye: 200000 },
+      { id: 'kart-1', tur: 'kart', acilis_bakiye: 0 },
+    ],
+    islemler: [
+      { id: 'g-0001', tarih: '2026-11-05', tur: 'gider', tutar: 30000, kaynak_id: 'kart-1' }, // Ekim bütçe ayı
+      { id: 't-0001', tarih: '2026-11-12', tur: 'transfer', tutar: 50000, kaynak_id: 'vds-1', hedef_id: 'y-1' }, // Kasım
+      { id: 'g-0002', tarih: '2026-11-14', tur: 'gider', tutar: 10000, kaynak_id: 'kart-1' },
+    ],
+  };
+  assert.equal(H.gecenAyaGore(v, '2026-10-20'), null);
+  const f = H.gecenAyaGore(v, '2026-11-15');
+  assert.equal(f.tarih, '2026-11-09');
+  assert.equal(f.yatirim, 50000);
+  assert.equal(f.kartBorcu, -10000);
+  assert.equal(f.netVarlik, -10000);
+});

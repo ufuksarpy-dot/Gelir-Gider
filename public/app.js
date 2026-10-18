@@ -120,12 +120,12 @@ function sayfaKapat() {
 const sayfaBaslik = (b) => `<h3><span>${e(b)}</span><button class="kapat" data-eylem="kapat" aria-label="Kapat">×</button></h3>`;
 
 let bildirimZamani;
-function bildirim(metin, eylem) {
+function bildirim(metin, eylem, { kutlama = false } = {}) {
   $('.bildirim')?.remove();
   clearTimeout(bildirimZamani);
   const el = document.createElement('div');
-  el.className = 'bildirim';
-  el.innerHTML = `<span>${e(metin)}</span>${eylem ? `<button>${e(eylem.ad)}</button>` : ''}`;
+  el.className = kutlama ? 'bildirim kutlama' : 'bildirim';
+  el.innerHTML = `${kutlama ? '<span class="yildiz" aria-hidden="true">✦</span>' : ''}<span>${e(metin)}</span>${eylem ? `<button>${e(eylem.ad)}</button>` : ''}`;
   if (eylem) $('button', el).addEventListener('click', () => { el.remove(); eylem.fn(); });
   document.body.append(el);
   bildirimZamani = setTimeout(() => el.remove(), eylem ? 5000 : 3500);
@@ -178,6 +178,16 @@ function anaEkran() {
   $('#menu').hidden = false;
   if (!D.ay) D.ay = H.butceAyi(bugun(), ayar());
   ciz();
+  haftaKutlamasi();
+}
+
+function haftaKutlamasi() {
+  const son = [...(D.veri?.haftalar || [])].sort((x, y) => y.pazartesi.localeCompare(x.pazartesi))[0];
+  if (!son || ayar().kutlanan_hafta === son.pazartesi) return;
+  if (son.fark > 0 && H.ekleGun(son.pazartesi, 6) >= H.ekleGun(bugun(), -7)) {
+    bildirim(`Hafta bütçenin ${para(son.fark)} altında kapandı · artan bütçeye eklendi`, null, { kutlama: true });
+  }
+  guvenli(async () => { await istek('/ayar', { yontem: 'PUT', govde: { kutlanan_hafta: son.pazartesi } }); D.veri.ayar.kutlanan_hafta = son.pazartesi; });
 }
 
 function ciz() {
@@ -517,6 +527,9 @@ function ozetCiz() {
   // Sade: büyük rakamın altında tek gri satır; alt satırda ₺ tekrar etmez; yatırım bilgisi en altta tek satır.
   const sayi = (k) => para(k).replace(' ₺', '');
   const tahmin = H.aySonuTahmini(v, gun);
+  // Gidişat: geçen bütçe ayının son gününe göre ↑ yeşil, ↓ turuncu, → gri (kurulum ayında yok).
+  const fark = H.gecenAyaGore(v, gun);
+  const ok = (x) => (fark ? `<div class="kucuk ${x > 0 ? 'iyi' : x < 0 ? 'uyari' : 'soluk'}">${x > 0 ? '↑' : x < 0 ? '↓' : '→'}${x ? ` ${sayi(Math.abs(x))}` : ''}</div>` : '');
   const yatirimSatiri = [
     yat?.buAy > 0 ? `Bu ay yatırıma ${para(yat.buAy)}` : bekleyenYatirim > 0 ? `${para(bekleyenYatirim)} yatırıma gönderilecek` : '',
     yat?.buYil > 0 ? `bu yıl ${para(yat.buYil)}` : '',
@@ -526,12 +539,17 @@ function ozetCiz() {
     <div class="buyuk">${paraParca(nakit)}</div>
     <button class="bag soluk" data-eylem="tahmin" style="padding-top:4px">Ay sonu tahmini (${e(H.tarihYaz(tahmin.son))}) ≈ ${para(tahmin.tutar)} ›</button>
     <div class="ucluk" style="margin-top:22px;padding-top:14px;border-top:0.5px solid var(--cerceve)">
-      <div><div class="etiket-k">Net varlık</div><div class="serif">${sayi(H.netVarlik(v))}</div></div>
-      <div><div class="etiket-k">Yatırım</div><div class="serif">${sayi(yatirimToplam)}</div></div>
-      <div><div class="etiket-k">Kart borcu</div><div class="serif">${sayi(kartBorcu)}</div></div>
+      <div><div class="etiket-k">Net varlık</div><div class="serif">${sayi(H.netVarlik(v))}</div>${ok(fark?.netVarlik)}</div>
+      <div><div class="etiket-k">Yatırım</div><div class="serif">${sayi(yatirimToplam)}</div>${ok(fark?.yatirim)}</div>
+      <div><div class="etiket-k">Kart borcu</div><div class="serif">${sayi(kartBorcu)}</div>${ok(fark?.kartBorcu)}</div>
     </div>
     ${yatirimSatiri ? `<div class="soluk kucuk" style="margin-top:14px">${yatirimSatiri.charAt(0).toUpperCase() + yatirimSatiri.slice(1)}</div>` : ''}
   </section>`;
+
+  const buAy = H.butceAyi(gun, a);
+  const gecenAy = H.ekleAy(buAy, -1);
+  const ka = H.kurulumAyi(a);
+  if (ka && gecenAy >= ka && gun <= H.ekleGun(H.ayAraligi(buAy, a).bas, 4) && a.ozet_kapandi !== gecenAy) html += ayOzetiKarti(H.ayOzeti(v, gecenAy));
 
   if (maas.sor) {
     html += `<div class="kart"><div class="ikili"><span><b>Maaş geldi mi?</b><br><span class="kucuk soluk">${e(H.ayAdi(maas.ay))} maaşı · ${para(maas.beklenen)}</span></span>
@@ -666,7 +684,7 @@ function odemeAc(id) {
   sayfaAc(`${sayfaBaslik(o.ad)}
     <p class="soluk kucuk">${e(aciklama)} Vade: ${e(H.tarihYaz(o.vade, true))} (${e(gunMetni(o.vade))}).</p>
     <form data-form="odeme" data-id="${e(o.id)}">
-      <label class="alan"><span>Tutar</span><input name="tutar" inputmode="decimal" value="${e(kurusMetin(o.tutar))}" required></label>
+      <label class="alan"><span>Tutar</span><input name="tutar" ${TUSLU} value="${e(kurusMetin(o.tutar))}" required></label>
       <div class="yan">
         <label class="alan"><span>${o.tur === 'sabit' ? 'Hangi hesaptan' : 'Gönderen'}</span><select name="kaynak_id">${hesapSecenekleri(null, o.kaynak_id)}</select></label>
         ${o.hedef_id ? `<label class="alan"><span>Alan</span><input value="${e(hesapAdi(o.hedef_id))}" disabled></label>` : ''}
@@ -770,17 +788,46 @@ function girisCiz() {
   yerlestir(el, html);
 }
 
+// Tuş takımının yazdığı ham tutar ("1234,5"): virgül bir kez, kuruş en çok 2 hane, tam kısım en çok 9 hane.
+function tusUygula(ham, t) {
+  if (t === 'sil') return ham.slice(0, -1);
+  if (t === ',') return ham.includes(',') ? ham : (ham || '0') + ',';
+  const [tamK, kesir] = ham.split(',');
+  if (kesir != null && kesir.length >= 2) return ham;
+  if (kesir == null && (tamK || '').length >= 9) return ham;
+  return ham === '0' ? t : ham + t;
+}
+
 function girisTus(t) {
   const g = D.giris;
-  if (t === 'sil') g.tutar = g.tutar.slice(0, -1);
-  else if (t === ',') { if (!g.tutar.includes(',')) g.tutar = (g.tutar || '0') + ','; }
-  else {
-    const [tamK, kesir] = g.tutar.split(',');
-    if (kesir != null && kesir.length >= 2) return;
-    if (kesir == null && (tamK || '').length >= 9) return;
-    g.tutar = g.tutar === '0' ? t : g.tutar + t;
-  }
+  g.tutar = tusUygula(g.tutar, t);
   girisCiz();
+}
+
+// Formlardaki tutar kutuları (${TUSLU}): dokununca telefon klavyesi yerine sayfanın altında tuş takımı.
+const TUSLU = 'readonly inputmode="none" data-tuslu autocomplete="off"';
+const TUSLAR = ['1', '2', '3', '4', '5', '6', '7', '8', '9', ',', '0', 'sil'];
+
+function tusluAc(inp) {
+  for (const x of $$('.tuslu-aktif')) x.classList.remove('tuslu-aktif');
+  inp.classList.add('tuslu-aktif');
+  const s = inp.closest('.sayfa');
+  if (s && !$('.tus-panel', s)) {
+    s.insertAdjacentHTML('beforeend', `<div class="tus-panel"><div class="tus-takimi">${TUSLAR.map((t) => `<button type="button" data-eylem="tt" data-t="${t}">${t === 'sil' ? '⌫' : t}</button>`).join('')}</div>
+      <button type="button" class="btn tam" data-eylem="tt-kapat">Tamam</button></div>`);
+  }
+}
+
+function tusluTus(t) {
+  const inp = $('.tuslu-aktif');
+  if (!inp) return;
+  const ham = tusUygula(inp.value.replace(/\./g, ''), t);
+  inp.value = ham ? tutarGoster(ham) : '';
+}
+
+function tusluKapat() {
+  for (const x of $$('.tuslu-aktif')) x.classList.remove('tuslu-aktif');
+  $('.tus-panel')?.remove();
 }
 
 function girisTutari() {
@@ -934,7 +981,7 @@ async function dagitimOnayla() {
   const serbest = islem.tutar + d.artan - d.giderler - yatirim;
   sayfaKapat();
   await yazVeCiz('/gelir', 'POST', { islem, paylar: { giderler: d.giderler, yatirim, serbest }, artan_aktarim: d.artan });
-  bildirim(yatirim > 0 ? `${para(yatirim, { tam: true })} yatırım havalesi listede` : `${islem.gelir_kaynagi} kaydedildi`, { ad: 'Geri al', fn: () => guvenli(() => islemGeriAl(islem.id)) });
+  bildirim(yatirim > 0 ? `${para(yatirim)} yatırıma ayrıldı · havale listede` : `${islem.gelir_kaynagi} kaydedildi`, { ad: 'Geri al', fn: () => guvenli(() => islemGeriAl(islem.id)) }, { kutlama: yatirim > 0 });
 }
 
 // ---------------------------------------------------------------- kısma (artan bütçe eksideyken)
@@ -992,7 +1039,7 @@ function aileAc() {
   sayfaAc(`${sayfaBaslik('Aileden geldi')}
     <p class="soluk kucuk">Gelir sayılmaz, dağıtılmaz; aileden alacağını kapatır. Alacak: ${para(alacak)}.</p>
     <form data-form="aile">
-      <label class="alan"><span>Gelen tutar</span><input name="tutar" inputmode="decimal" value="${e(kurusMetin(alacak))}" required></label>
+      <label class="alan"><span>Gelen tutar</span><input name="tutar" ${TUSLU} value="${e(kurusMetin(alacak))}" required></label>
       <div class="yan"><label class="alan"><span>Yattığı hesap</span><select name="hedef_id">${hesapSecenekleri((h) => h.tur !== 'kart', a.maas?.hesap_id || a.harcama_hesabi)}</select></label>
       <label class="alan"><span>Tarih</span><input type="date" name="tarih" value="${bugun()}" required></label></div>
       <button class="btn ana tam">Kaydet</button>
@@ -1072,7 +1119,7 @@ function islemAc(id) {
   if (!i) return;
   const v = D.veri;
   const kaynakli = i.odeme_id ? '<p class="soluk kucuk">Bu kayıt bir ödemeden/havaleden geldi. Silersen ödeme yeniden "yapılacak" olur.</p>' : '';
-  let alanlar = `<div class="yan"><label class="alan"><span>Tutar</span><input name="tutar" inputmode="decimal" value="${e(kurusMetin(i.tutar))}" required></label>
+  let alanlar = `<div class="yan"><label class="alan"><span>Tutar</span><input name="tutar" ${TUSLU} value="${e(kurusMetin(i.tutar))}" required></label>
     <label class="alan"><span>Tarih</span><input type="date" name="tarih" value="${e(i.tarih)}" required></label></div>`;
   if (i.tur === 'gider') {
     const kart = v.hesaplar.find((h) => h.id === i.kaynak_id)?.tur === 'kart';
@@ -1140,7 +1187,7 @@ function cuzdanCiz() {
   const hedefSatiri = (h) => {
     const t = hb.get(h.id) || 0;
     const oran = h.hedef_tutar ? t / h.hedef_tutar : 0;
-    return `<button class="satir" data-eylem="hedef" data-id="${e(h.id)}"><span class="simge">🎯</span><span class="ad"><b>${e(h.ad)}${h.hafta_farki ? '<span class="etiket">hafta farkı</span>' : ''}</b>
+    return `<button class="satir" data-eylem="hedef" data-id="${e(h.id)}"><span class="simge">🎯</span><span class="ad"><b>${e(h.ad)}</b>${h.hafta_farki ? '<span>hafta farkı</span>' : ''}
       ${h.hedef_tutar ? `<div class="cubuk"><i style="width:${Math.min(100, oran * 100).toFixed(1)}%"></i></div>` : `<span>${e(hesapAdi(h.hesap_id))}</span>`}</span>
       <span class="tutar">${para(t)}${h.hedef_tutar ? `<div class="soluk kucuk">/ ${para(h.hedef_tutar)}</div>` : ''}</span></button>`;
   };
@@ -1167,7 +1214,7 @@ function hesapAc(id) {
     : `<div class="kart"><div class="soluk kucuk">${kart ? 'Uygulamaya göre borç' : 'Uygulamaya göre bakiye'}</div><div class="buyuk sayi">${para(kart ? -bakiye : bakiye)}</div></div>`;
   sayfaAc(`${sayfaBaslik(h.ad)}${ust}
     <form data-form="esitle" data-id="${e(id)}" data-kart="${kart ? 1 : 0}">
-      <label class="alan"><span>${yat ? 'Güncel değeri yaz' : kart ? 'Bankadaki güncel borç' : 'Bankadaki rakam'}</span><input name="bakiye" inputmode="decimal" placeholder="${e(kurusMetin(kart ? -bakiye : bakiye))}" required></label>
+      <label class="alan"><span>${yat ? 'Güncel değeri yaz' : kart ? 'Bankadaki güncel borç' : 'Bankadaki rakam'}</span><input name="bakiye" ${TUSLU} placeholder="${e(kurusMetin(kart ? -bakiye : bakiye))}" required></label>
       <p class="soluk kucuk">${yat ? 'Uygulama fiyat çekmez, öneri vermez; değeri sen yazarsın. Fark kazanç olarak sayılır.' : 'Fark, "bakiye düzeltme" kaydı olur.'}</p>
       <div class="btnlar"><button type="button" class="btn" data-eylem="hesap-duzenle" data-id="${e(id)}">Düzenle</button><button class="btn ana">${yat ? 'Değeri güncelle' : 'Eşitle'}</button></div>
     </form>
@@ -1295,18 +1342,20 @@ function sabitlerCiz() {
   return `<header class="ust"><h1>Sabit ödemeler</h1><button class="kucuk-btn" data-ekran="ay">‹ Ay</button></header>
     <div class="bilgi kucuk">Aylık karşılığı ${para(Math.round(aylik))}. Vadesi ayın 1–9'u arasında olan ödeme bir önceki bütçe ayından ödenir.</div>
     <div class="kart ince">${liste.length ? liste.map((s) => `<button class="satir" data-eylem="sabit" data-id="${e(s.id)}"><span class="simge">📄</span>
-      <span class="ad"><b>${e(s.ad)}${s.otomatik ? '<span class="etiket">otomatik</span>' : ''}${s.degisken ? '<span class="etiket">değişken</span>' : ''}${s.is_gideri ? '<span class="etiket">iş</span>' : ''}${s.aile ? '<span class="etiket">ailem ödüyor</span>' : ''}</b>
-      <span>${e(PERIYOTLAR.find((p) => p[0] === s.periyot)?.[1] || '')}, ${s.gun}'${ekGetir(s.gun)} · ${e(hesapAdi(s.hesap_id))}${s.son_vade ? ` · son ${e(H.tarihYaz(s.son_vade))}` : ''}</span></span>
+      <span class="ad"><b>${e(s.ad)}</b><span>${sabitAltSatir(s)}</span></span>
       <span class="tutar">${para(s.tutar)}</span></button>`).join('') : '<div class="bos">Sabit ödeme yok.</div>'}</div>
     <button class="btn ana tam" data-eylem="sabit" style="margin-top:8px">+ Sabit ödeme</button>`;
 }
 
 // "5'i", "10'u", "20'si" … (Türkçe ünlü uyumu)
-function ekGetir(n) {
-  const son = n % 10;
-  const onlar = n % 100 - son;
-  if (son === 0) return { 10: 'u', 20: 'si', 30: 'u' }[onlar] || 'u';
-  return { 1: 'i', 2: 'si', 3: 'ü', 4: 'ü', 5: 'i', 6: 'sı', 7: 'si', 8: 'i', 9: 'u' }[son];
+// Sabit ödemenin altındaki sade gri satır (rozet yerine): "Her ay 27 · Bonus · otomatik · son 3 Mart".
+function sabitAltSatir(s) {
+  return [
+    `${PERIYOTLAR.find((p) => p[0] === s.periyot)?.[1] || ''} ${s.gun}`,
+    hesapAdi(s.hesap_id),
+    s.otomatik && 'otomatik', s.degisken && 'değişken', s.is_gideri && 'iş', s.aile && 'ailem ödüyor',
+    s.son_vade && `son ${H.tarihYaz(s.son_vade)}`,
+  ].filter(Boolean).map(e).join(' · ');
 }
 
 function sonrakiAylar(n = 12) {
@@ -1327,7 +1376,7 @@ function sabitDuzenle(id) {
   sayfaAc(`${sayfaBaslik(id ? 'Sabit ödemeyi düzenle' : 'Yeni sabit ödeme')}
     <form data-form="sabit" data-id="${e(id || '')}">
       <label class="alan"><span>Ad</span><input name="ad" value="${e(s.ad)}" maxlength="40" required placeholder="Kira, aidat, internet…"></label>
-      <div class="yan"><label class="alan"><span>Tutar</span><input name="tutar" inputmode="decimal" value="${e(kurusMetin(s.tutar))}" required></label>
+      <div class="yan"><label class="alan"><span>Tutar</span><input name="tutar" ${TUSLU} value="${e(kurusMetin(s.tutar))}" required></label>
       <label class="alan"><span>Ayın kaçı</span><input name="gun" type="number" min="1" max="31" value="${e(s.gun)}" required></label></div>
       <div class="yan"><label class="alan"><span>Periyot</span><select name="periyot">${secenekler(PERIYOTLAR, s.periyot)}</select></label>
       <label class="alan"><span>Sıradaki ödeme ayı</span><select name="ilk_ay">${secenekler(sonrakiAylar(), s.ilk_ay && s.periyot > 1 ? H.sabitVadeleri(s, bugun(), H.ekleGun(bugun(), 400))[0]?.slice(0, 7) : '', 'Otomatik')}</select></label></div>
@@ -1440,7 +1489,7 @@ async function ayarKaydet(form) {
 function kategorilerCiz() {
   const kat = aktif(D.veri.kategoriler).sort((a, b) => a.sira - b.sira || a.ad.localeCompare(b.ad, 'tr'));
   const grup = (baslik, liste, birim) => `<h2>${baslik}</h2><div class="kart ince">${liste.length ? liste.map((k) => `<button class="satir" data-eylem="kategori" data-id="${e(k.id)}">
-    <span class="simge">${e(k.simge || '•')}</span><span class="ad"><b>${e(k.ad)}${k.hizli === 0 ? '<span class="etiket">gizli</span>' : ''}</b></span><span class="tutar">${para(k.limit_tutar)} <span class="soluk kucuk">${birim}</span></span></button>`).join('') : '<div class="bos">Yok</div>'}</div>`;
+    <span class="simge">${e(k.simge || '•')}</span><span class="ad"><b>${e(k.ad)}</b>${k.hizli === 0 ? '<span>hızlı girişte gizli</span>' : ''}</span><span class="tutar">${para(k.limit_tutar)} <span class="soluk kucuk">${birim}</span></span></button>`).join('') : '<div class="bos">Yok</div>'}</div>`;
   return `<header class="ust"><h1>Kategoriler</h1><button class="kucuk-btn" data-ekran="ayarlar">‹ Ayarlar</button></header>
     ${grup('Haftalık', kat.filter((k) => k.tur === 'haftalik' && !k.is_gideri), '/ hafta')}
     ${grup('Aylık', kat.filter((k) => k.tur === 'aylik' && !k.is_gideri), '/ ay')}
@@ -1455,7 +1504,7 @@ function kategoriDuzenle(id) {
       <div class="yan"><label class="alan" style="flex:0 0 76px"><span>Simge</span><input name="simge" value="${e(k.simge || '')}" maxlength="8"></label>
       <label class="alan"><span>Ad</span><input name="ad" value="${e(k.ad)}" maxlength="30" required></label></div>
       <div class="yan"><label class="alan"><span>Tür</span><select name="tur">${secenekler([['haftalik', 'Haftalık'], ['aylik', 'Aylık']], k.tur)}</select></label>
-      <label class="alan"><span>Limit</span><input name="limit_tutar" inputmode="decimal" value="${e(kurusMetin(k.limit_tutar))}"></label></div>
+      <label class="alan"><span>Limit</span><input name="limit_tutar" ${TUSLU} value="${e(kurusMetin(k.limit_tutar))}"></label></div>
       <label class="anahtar"><span>İş gideri (kişisel bütçeye karışmaz, aylık sayılır)</span><input type="checkbox" name="is_gideri" ${k.is_gideri ? 'checked' : ''}></label>
       <label class="anahtar"><span>Hızlı girişte göster</span><input type="checkbox" name="hizli" ${k.hizli !== 0 ? 'checked' : ''}></label>
       <label class="alan"><span>Sıra</span><input name="sira" type="number" value="${e(k.sira ?? 0)}"></label>
@@ -1770,6 +1819,17 @@ function sihirbazEylem(eylem, el) {
   sihirbazCiz();
 }
 
+function ayOzetiKarti(o) {
+  const fark = o.plan - o.gercek;
+  return `<div class="kart ozet-kart">
+    <div class="ikili"><b>${e(o.ad)} özeti</b><button class="kapat" data-eylem="ozet-kapat" data-ay="${e(o.ay)}" aria-label="Kapat">×</button></div>
+    <div class="soluk kucuk">${e(H.ayAraligiYaz(o.ay, ayar()))}</div>
+    ${o.yatirim > 0 ? `<div style="margin-top:10px">Yatırıma <b class="serif altin">${para(o.yatirim)}</b> ayrıldı</div>` : ''}
+    <div style="margin-top:4px">Bütçe planın <b class="serif">${para(Math.abs(fark))}</b> ${fark >= 0 ? 'altında kaldı' : 'üstüne çıktı'}</div>
+    ${o.enCok.length ? `<div class="soluk kucuk" style="margin-top:10px">En çok harcanan</div>${o.enCok.map((k) => `<div class="ikili kucuk" style="margin-top:4px"><span>${e(k.simge)} ${e(k.ad)}</span><span class="serif">${para(k.tutar)}</span></div>`).join('')}` : ''}
+  </div>`;
+}
+
 // Ay sonu tahmininin dökümü (hesap: H.aySonuTahmini).
 function tahminAc() {
   const t = H.aySonuTahmini(D.veri, bugun());
@@ -1786,6 +1846,9 @@ const SURUM = '1.7';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),
+  'ozet-kapat': (el) => guvenli(() => yazVeCiz('/ayar', 'PUT', { ozet_kapandi: el.dataset.ay })),
+  tt: (el) => tusluTus(el.dataset.t),
+  'tt-kapat': () => tusluKapat(),
   kapat: () => sayfaKapat(),
   yeniden: () => basla(),
   giris: () => girisAc(),
@@ -1981,6 +2044,8 @@ document.addEventListener('touchend', () => {
 
 document.addEventListener('click', (ev) => {
   if (Date.now() < tiklamaYut) { tiklamaYut = 0; ev.preventDefault(); return; }
+  const tuslu = ev.target.closest('[data-tuslu]');
+  if (tuslu) return tusluAc(tuslu);
   const el = ev.target.closest('[data-eylem], [data-ekran]');
   if (!el || el.disabled) return;
   if (el.dataset.ekran) { ev.preventDefault(); sayfaKapat(); return ekranaGit(el.dataset.ekran); }
@@ -2019,7 +2084,7 @@ document.addEventListener('change', (ev) => {
 // (hafta kapanışı, 10'unda çekiş, otomatik ödemeler).
 document.addEventListener('visibilitychange', () => {
   if (arkaPlanKontrol() !== 'acik') return;
-  if (D.veri && !D.giris && !$('.sayfa')) guvenli(async () => { await yenile(); ciz(); });
+  if (D.veri && !D.giris && !$('.sayfa')) guvenli(async () => { await yenile(); ciz(); haftaKutlamasi(); });
 });
 
 basla();

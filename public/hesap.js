@@ -770,6 +770,42 @@ export function varlikDagilimi(veri) {
   return d;
 }
 
+// Biten bütçe ayının özeti (yeni ayın ilk günlerindeki kart): yatırıma giden (yatırım hesaplarına net transfer),
+// plan ve gerçekleşen, en çok harcanan 3 kategori (bütçe payı; ailenin ödediği ve sabit ödemeler hariç).
+export function ayOzeti(veri, ay) {
+  const ayar = ayarBirlestir(veri.ayar);
+  const { bas, son } = ayAraligi(ay, ayar);
+  const yatirimHesaplari = new Set(aktifler(veri.hesaplar).filter((h) => h.tur === 'yatirim' || h.id === ayar.yatirim_hesabi).map((h) => h.id));
+  const kat = haritala(veri.kategoriler);
+  let yatirim = 0;
+  const kategoriler = new Map();
+  for (const i of canli(veri.islemler)) {
+    if (i.tarih < bas || i.tarih > son) continue;
+    if (i.tur === 'transfer') {
+      if (yatirimHesaplari.has(i.hedef_id) && !yatirimHesaplari.has(i.kaynak_id)) yatirim += i.tutar;
+      if (yatirimHesaplari.has(i.kaynak_id) && !yatirimHesaplari.has(i.hedef_id)) yatirim -= i.tutar;
+    } else if (i.tur === 'gider' && i.kategori_id && kat.has(i.kategori_id) && giderKovasi(i, kat)) {
+      kategoriler.set(i.kategori_id, (kategoriler.get(i.kategori_id) || 0) + butcePayi(i));
+    }
+  }
+  const p = ayPlani(veri, ay);
+  const enCok = [...kategoriler].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([id, tutar]) => ({ ad: kat.get(id).ad, simge: kat.get(id).simge || '', tutar }));
+  return { ay, ad: ayAdi(ay), bas, son, yatirim, plan: p.plan, gercek: p.gercek, enCok };
+}
+
+// Gidişat okları için: bugünkü net varlık, yatırım ve kart borcunun geçen bütçe ayının son gününe göre farkı.
+// Kurulum ayındaysak (karşılaştırılacak ay yok) null.
+export function gecenAyaGore(veri, gun) {
+  const ayar = ayarBirlestir(veri.ayar);
+  const onceki = ekleAy(butceAyi(gun, ayar), -1);
+  const ka = kurulumAyi(ayar);
+  if (!ka || onceki < ka) return null;
+  const { son } = ayAraligi(onceki, ayar);
+  const simdi = varlikDagilimi(veri);
+  const o = varlikDagilimi(sinirliVeri(veri, son));
+  return { tarih: son, netVarlik: netVarlik(veri) - netVarlik(veri, son), yatirim: simdi.yatirim - o.yatirim, kartBorcu: simdi.kartBorcu - o.kartBorcu };
+}
+
 // Ay sonu tahmini: bütçe ayının son günü (maaştan önce) bütün borçlar ödenmiş sayılırsa elde kalan.
 // Kullanılabilir bakiye − kart borcu + aileden alacak − bu ay kalan sabit ödemeler − haftalık ve aylık
 // limitlerin kalanı (aşılan kategori 0; limitsiz kategori bir şey eklemez) − beklenmeyen payının kalanı −

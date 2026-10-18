@@ -262,7 +262,7 @@ function kayitKaldir(B, tur, id, gun) {
   return { tamam: true };
 }
 
-const DUZENLENEBILIR_AYARLAR = ['havuz_ay', 'yatirim_tutari', 'sela', 'beklenmeyen', 'maas', 'gelir_kaynaklari', 'harcama_hesabi', 'havuz_hesabi', 'birikim_hesabi', 'yatirim_hesabi', 'ay_baslangic_gunu'];
+const DUZENLENEBILIR_AYARLAR = ['havuz_ay', 'yatirim_tutari', 'sela', 'beklenmeyen', 'maas', 'gelir_kaynaklari', 'harcama_hesabi', 'havuz_hesabi', 'birikim_hesabi', 'yatirim_hesabi', 'ay_baslangic_gunu', 'ozet_kapandi', 'kutlanan_hafta'];
 
 function ayarTemizle(govde) {
   const a = {};
@@ -282,6 +282,9 @@ function ayarTemizle(govde) {
   }
   if ('ay_baslangic_gunu' in a) { const g = tam(a.ay_baslangic_gunu); if (!(g >= 1 && g <= 28)) throw new ApiHata(400, 'Ay başlangıç günü 1–28 olmalı'); a.ay_baslangic_gunu = g; }
   for (const k of ['harcama_hesabi', 'havuz_hesabi', 'birikim_hesabi', 'yatirim_hesabi']) if (k in a) a[k] = metin(a[k], 64);
+  // Arayüz işaretleri: kapatılan aylık özet (bütçe ayı) ve kutlaması gösterilen son hafta (pazartesi).
+  if ('ozet_kapandi' in a && !/^\d{4}-\d{2}$/.test(a.ozet_kapandi)) throw new ApiHata(400, 'Ay geçersiz');
+  if ('kutlanan_hafta' in a && !/^\d{4}-\d{2}-\d{2}$/.test(a.kutlanan_hafta)) throw new ApiHata(400, 'Hafta geçersiz');
   return a;
 }
 

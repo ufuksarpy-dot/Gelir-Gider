@@ -279,3 +279,26 @@ test('ay sonu tahmini: bakiye − kart borcu − kalan sabit − kalan limitler;
   assert.equal(t.tutar, 1000000 - 430000 - 50000 - (85714 - 30000 + 300000));
   assert.ok(!t.kalemler.some((k) => k.ad === 'Kalan aylık bütçeler'));
 });
+
+test('ayOzeti: yatırıma giden, plan/gerçekleşen, en çok harcanan 3 kategori', async () => {
+  const g = { gun: '2026-10-18' };
+  const api5 = yerelApi(bellekDeposu(), { bugun: () => g.gun });
+  await api5.istek('/kurulum', { yontem: 'POST', govde: {
+    baslangic: '2026-10-13',
+    ayar: { ay_baslangic_gunu: 10, maas: { tutar: 5000000, hesap_id: 'v-5555' }, harcama_hesabi: 'v-5555', yatirim_hesabi: 'y-5555' },
+    hesaplar: [{ id: 'v-5555', ad: 'Deneme vadesiz', tur: 'vadesiz', acilis_bakiye: 3000000 }, { id: 'y-5555', ad: 'Deneme yatırım', tur: 'yatirim', acilis_bakiye: 0 }],
+    kategoriler: ['a', 'b', 'c', 'd'].map((x) => ({ id: `k-${x}${x}${x}${x}`, ad: `Kategori ${x}`, tur: 'aylik', limit_tutar: 100000 })),
+  } });
+  const gider = (id, tutar, kategori, ek = {}) => api5.istek('/islem', { yontem: 'POST', govde: { id, tarih: '2026-10-20', tur: 'gider', tutar, kaynak_id: 'v-5555', kategori_id: kategori, ...ek } });
+  await gider('oz-00001', 50000, 'k-aaaa');
+  await gider('oz-00002', 90000, 'k-bbbb');
+  await gider('oz-00003', 10000, 'k-cccc');
+  await gider('oz-00004', 20000, 'k-dddd');
+  await gider('oz-00005', 99000, 'k-cccc', { aile: 1 }); // ailenin ödediği sayılmaz
+  await api5.istek('/islem', { yontem: 'POST', govde: { id: 'oz-00006', tarih: '2026-11-08', tur: 'transfer', tutar: 700000, kaynak_id: 'v-5555', hedef_id: 'y-5555' } });
+  g.gun = '2026-11-11';
+  const o = H.ayOzeti(await api5.istek('/veri'), '2026-10');
+  assert.equal(o.yatirim, 700000);
+  assert.deepEqual(o.enCok.map((x) => [x.ad, x.tutar]), [['Kategori b', 90000], ['Kategori a', 50000], ['Kategori d', 20000]]);
+  assert.equal(o.gercek, 170000);
+});
