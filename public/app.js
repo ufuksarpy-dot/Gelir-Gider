@@ -502,6 +502,7 @@ function ozetCiz() {
   const bekleyenYatirim = v.odemeler.filter((o) => o.durum === 'bekliyor' && o.hedef_id && o.hedef_id === a.yatirim_hesabi).reduce((t, o) => t + o.tutar, 0);
   // Sade: büyük rakamın altında tek gri satır; alt satırda ₺ tekrar etmez; yatırım bilgisi en altta tek satır.
   const sayi = (k) => para(k).replace(' ₺', '');
+  const tahmin = H.aySonuTahmini(v, gun);
   const yatirimSatiri = [
     yat?.buAy > 0 ? `Bu ay yatırıma ${para(yat.buAy)}` : bekleyenYatirim > 0 ? `${para(bekleyenYatirim)} yatırıma gönderilecek` : '',
     yat?.buYil > 0 ? `bu yıl ${para(yat.buYil)}` : '',
@@ -509,7 +510,7 @@ function ozetCiz() {
   html += `<section class="hero">
     <div class="etiket-k">Kullanılabilir bakiye</div>
     <div class="buyuk">${paraParca(nakit)}</div>
-    ${kartBorcu < 0 ? `<div class="soluk" style="font-size:13px;margin-top:4px">Kart borcu ödenince ${para(nakit + kartBorcu)}</div>` : ''}
+    <button class="bag soluk" data-eylem="tahmin" style="padding-top:4px">Ay sonu tahmini (${e(H.tarihYaz(tahmin.son))}) ≈ ${para(tahmin.tutar)} ›</button>
     <div class="ucluk" style="margin-top:22px;padding-top:14px;border-top:0.5px solid var(--cerceve)">
       <div><div class="etiket-k">Net varlık</div><div class="serif">${sayi(H.netVarlik(v))}</div></div>
       <div><div class="etiket-k">Yatırım</div><div class="serif">${sayi(yatirimToplam)}</div></div>
@@ -1755,12 +1756,22 @@ function sihirbazEylem(eylem, el) {
   sihirbazCiz();
 }
 
+// Ay sonu tahmininin dökümü (hesap: H.aySonuTahmini).
+function tahminAc() {
+  const t = H.aySonuTahmini(D.veri, bugun());
+  sayfaAc(`${sayfaBaslik('Ay sonu tahmini')}
+    <div class="bilgi kucuk">${e(H.tarihYaz(t.son, true))}, maaştan önceki gün: kart borçları ödenmiş ve bu ayın kalan limitleri harcanmış sayılırsa elinde kalan. Limiti aşılan kategori 0 sayılır; ailenin ödediği taksit hem borç hem alacak olduğu için hesaba girmez.</div>
+    <div class="kart ince">${t.kalemler.map((k) => `<div class="satir"><span class="ad">${e(k.ad)}</span><span class="tutar">${para(k.tutar, { isaret: true })}</span></div>`).join('')}
+      <div class="satir"><span class="ad"><b>Ay sonu tahmini</b></span><span class="tutar"><b>${para(t.tutar)}</b></span></div></div>`);
+}
+
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.5';
+const SURUM = '1.6';
 
 const EYLEMLER = {
+  tahmin: () => tahminAc(),
   kapat: () => sayfaKapat(),
   yeniden: () => basla(),
   giris: () => girisAc(),

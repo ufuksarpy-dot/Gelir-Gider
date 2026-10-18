@@ -251,3 +251,31 @@ test('kategori değişince bu ayın dondurulmuş planı yeniden hesaplanır; ge�
   assert.equal(H.ayPlani(v, '2026-10').plan, ekim);
   assert.equal(H.ayPlani(v, '2026-11').kovalar.find((k) => k.id === 'aylik').plan, 900000);
 });
+
+test('ay sonu tahmini: bakiye − kart borcu − kalan sabit − kalan limitler; aşılan kategori 0, ailenin taksiti sayılmaz', async () => {
+  const g = { gun: '2026-10-18' };
+  const api4 = yerelApi(bellekDeposu(), { bugun: () => g.gun });
+  await api4.istek('/kurulum', { yontem: 'POST', govde: {
+    baslangic: '2026-10-13',
+    ayar: { ay_baslangic_gunu: 10, maas: { tutar: 5000000, hesap_id: 'v-3333' }, harcama_hesabi: 'v-3333' },
+    hesaplar: [
+      { id: 'v-3333', ad: 'Deneme vadesiz', tur: 'vadesiz', acilis_bakiye: 1000000 },
+      { id: 'kk-3333', ad: 'Deneme kart', tur: 'kart', acilis_bakiye: 0, limit_tutar: 5000000, kesim_gunu: 12, son_odeme_gunu: 22, odeme_hesap_id: 'v-3333' },
+    ],
+    kategoriler: [
+      { id: 'k-hafta', ad: 'Haftalık deneme', tur: 'haftalik', limit_tutar: 100000 },
+      { id: 'k-ay', ad: 'Aylık deneme', tur: 'aylik', limit_tutar: 310000 },
+    ],
+    sabitler: [
+      { id: 's-abone', ad: 'Deneme abonelik', tutar: 50000, gun: 27, periyot: 1, ilk_ay: '2026-10', hesap_id: 'kk-3333', otomatik: 1 },
+      { id: 's-aile', ad: 'Deneme aile taksiti', tutar: 100000, gun: 3, periyot: 1, ilk_ay: '2026-11', hesap_id: 'kk-3333', otomatik: 1, aile: 1 },
+    ],
+  } });
+  await api4.istek('/islem', { yontem: 'POST', govde: { id: 'th-0001', tarih: '2026-10-14', tur: 'gider', tutar: 30000, kaynak_id: 'kk-3333', kategori_id: 'k-hafta' } });
+  await api4.istek('/islem', { yontem: 'POST', govde: { id: 'th-0002', tarih: '2026-10-15', tur: 'gider', tutar: 400000, kaynak_id: 'kk-3333', kategori_id: 'k-ay' } });
+  const t = H.aySonuTahmini(await api4.istek('/veri'), g.gun);
+  assert.equal(t.son, '2026-11-09');
+  // 10.000 − 4.300 kart − 500 abonelik − (857,14 − 300 bu hafta + 3 × 1.000) − 0 (aylık aşıldı: 2.800 limit, 4.000 harcandı)
+  assert.equal(t.tutar, 1000000 - 430000 - 50000 - (85714 - 30000 + 300000));
+  assert.ok(!t.kalemler.some((k) => k.ad === 'Kalan aylık bütçeler'));
+});

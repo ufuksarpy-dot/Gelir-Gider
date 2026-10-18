@@ -770,6 +770,65 @@ export function varlikDagilimi(veri) {
   return d;
 }
 
+// Ay sonu tahmini: bütçe ayının son günü (maaştan önce) bütün borçlar ödenmiş sayılırsa elde kalan.
+// Kullanılabilir bakiye − kart borcu + aileden alacak − bu ay kalan sabit ödemeler − haftalık ve aylık
+// limitlerin kalanı (aşılan kategori 0; limitsiz kategori bir şey eklemez) − beklenmeyen payının kalanı −
+// yatırıma bekleyen havaleler. Ailenin ödediği sabit hem borç hem alacak olduğu için hiç sayılmaz.
+export function aySonuTahmini(veri, gun) {
+  const ayar = ayarBirlestir(veri.ayar);
+  const ay = butceAyi(gun, ayar);
+  const { bas, son } = ayAraligi(ay, ayar);
+  const { hesaplar, kartBorcu } = varlikDagilimi(veri);
+  const kat = haritala(veri.kategoriler);
+  const odemeler = new Map((veri.odemeler || []).map((o) => [o.id, o]));
+  const kalemler = [];
+  const ekle = (ad, tutar) => { if (tutar) kalemler.push({ ad, tutar }); };
+  ekle('Kullanılabilir bakiye', hesaplar);
+  ekle('Kart borcu', kartBorcu);
+  ekle('Aileden alacak', aileAlacagi(veri));
+
+  let sabit = 0;
+  for (const s of aktifler(veri.sabitler)) {
+    if (s.aile) continue;
+    for (const v of sabitVadeleri(s, bas, son)) {
+      const o = odemeler.get(odemeKimligi.sabit(s.id, v));
+      if (o ? o.durum === 'bekliyor' : v >= gun) sabit += s.tutar;
+    }
+  }
+  ekle('Kalan sabit ödemeler', -sabit);
+
+  let haftalik = 0;
+  const buHafta = pazartesi(gun);
+  for (const p of ayHaftalari(ay, ayar)) {
+    if (p < buHafta) continue;
+    if (p === buHafta) haftalik += toplam(haftaDurumu(veri, p, gun).satirlar, (s) => Math.max(0, s.kalan));
+    else haftalik += toplam(Object.values(haftaLimitleri(veri, p)));
+  }
+  ekle('Kalan haftalık bütçeler', -haftalik);
+
+  const oran = ayOrani(ay, ayar);
+  const harcanan = new Map();
+  let beklenmeyenHarcanan = 0;
+  for (const i of canli(veri.islemler)) {
+    if (i.tur !== 'gider' || i.tarih < bas || i.tarih > son) continue;
+    const kova = giderKovasi(i, kat);
+    if (kova === 'aylik') harcanan.set(i.kategori_id, (harcanan.get(i.kategori_id) || 0) + butcePayi(i));
+    else if (kova === 'beklenmeyen') beklenmeyenHarcanan += butcePayi(i);
+  }
+  let aylik = 0;
+  for (const k of aktifler(veri.kategoriler)) {
+    if (k.tur === 'aylik' && !k.is_gideri) aylik += Math.max(0, yuvarla(k.limit_tutar * oran) - (harcanan.get(k.id) || 0));
+  }
+  ekle('Kalan aylık bütçeler', -aylik);
+  ekle('Kalan beklenmeyen payı', -Math.max(0, yuvarla((Number(ayar.beklenmeyen) || 0) * oran) - beklenmeyenHarcanan));
+
+  const banka = new Set(aktifler(veri.hesaplar).filter((h) => h.tur !== 'kart' && h.tur !== 'yatirim' && h.id !== ayar.yatirim_hesabi).map((h) => h.id));
+  const havale = toplam((veri.odemeler || []).filter((o) => o.durum === 'bekliyor' && o.tur === 'havale' && o.vade <= son && banka.has(o.kaynak_id) && o.hedef_id && !banka.has(o.hedef_id)), (o) => o.tutar);
+  ekle('Yatırıma gidecek havaleler', -havale);
+
+  return { ay, son, tutar: toplam(kalemler, (x) => x.tutar), kalemler };
+}
+
 // Son n bütçe ayının sonundaki net varlık (bu ay için bugün). Kurulumdan öncesi yok.
 export function netVarlikSerisi(veri, gun, n = 6) {
   const ayar = ayarBirlestir(veri.ayar);
