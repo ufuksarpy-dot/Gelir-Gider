@@ -1980,7 +1980,7 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.13';
+const SURUM = '1.14';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),

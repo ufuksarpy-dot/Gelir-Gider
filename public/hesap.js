@@ -927,10 +927,19 @@ export function aySonuTahmini(veri, gun) {
   const ayir = (id, x) => ayrilan.set(id, (ayrilan.get(id) || 0) + x);
   const buHafta = pazartesi(gun);
   const sonrakiKisma = sonrakiHaftaKismasi(veri, gun, { hepsiHarcanir: true });
-  for (const p of ayHaftalari(ay, ayar)) {
-    if (p < buHafta) continue;
-    if (p === buHafta) for (const s of haftaDurumu(veri, p, gun).satirlar) ayir(s.kategori_id, Math.max(0, s.kalan));
-    else for (const [id, l] of Object.entries(haftaLimitleri(veri, p))) ayir(id, l - (p === ekleGun(buHafta, 7) ? Number(sonrakiKisma[id]) || 0 : 0));
+  // Haftalar gün payıyla: hangi aya ait olursa olsun bugünden ay sonuna kadarki günleri sayılır (para günlere eşit
+  // harcanır varsayılır). Ör. ayın son 3 günü sonraki ayın haftasındaysa o haftanın 3/7'si; bu ayın son haftası ay
+  // sonundan taşıyorsa taşan günleri sayılmaz. Bu haftada kalan para kalan günlere bölünür.
+  for (let p = buHafta; p <= son; p = ekleGun(p, 7)) {
+    const bitis = ekleGun(p, 6) < son ? ekleGun(p, 6) : son;
+    if (p === buHafta) {
+      const h = haftaDurumu(veri, p, gun);
+      const pay = (gunFarki(gun, bitis) + 1) / h.kalanGun;
+      for (const s of h.satirlar) ayir(s.kategori_id, yuvarla(Math.max(0, s.kalan) * pay));
+    } else {
+      const pay = (gunFarki(p, bitis) + 1) / 7;
+      for (const [id, l] of Object.entries(haftaLimitleri(veri, p))) ayir(id, yuvarla((l - (p === ekleGun(buHafta, 7) ? Number(sonrakiKisma[id]) || 0 : 0)) * pay));
+    }
   }
   const altSatirlar = (idler, asim = new Map()) => idler.filter((id) => ayrilan.get(id) || asim.get(id))
     .map((id) => ({ ad: kat.get(id)?.ad || '?', tutar: ayrilan.get(id) || 0, asim: asim.get(id) || 0 }));

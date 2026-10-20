@@ -275,8 +275,9 @@ test('ay sonu tahmini: bakiye − kart borcu − kalan sabit − kalan limitler;
   await api4.istek('/islem', { yontem: 'POST', govde: { id: 'th-0002', tarih: '2026-10-15', tur: 'gider', tutar: 400000, kaynak_id: 'kk-3333', kategori_id: 'k-ay' } });
   const t = H.aySonuTahmini(await api4.istek('/veri'), g.gun);
   assert.equal(t.son, '2026-11-09');
-  // 10.000 − 4.300 kart − 500 abonelik − (857,14 − 300 bu hafta + 3 × 1.000) − 0 (aylık aşıldı: 2.800 limit, 4.000 harcandı)
-  assert.equal(t.tutar, 1000000 - 430000 - 50000 - (85714 - 30000 + 300000));
+  // 10.000 − 4.300 kart − 500 abonelik − (857,14 − 300 bu hafta + 3 × 1.000 + 9 Kas'ın 1/7'si: Kasım haftası, gün Ekim'de)
+  // − 0 (aylık aşıldı: 2.800 limit, 4.000 harcandı)
+  assert.equal(t.tutar, 1000000 - 430000 - 50000 - (85714 - 30000 + 300000 + 14286));
   assert.ok(!t.kalemler.some((k) => k.ad === 'Kalan aylık bütçeler'));
 });
 

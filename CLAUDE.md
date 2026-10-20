@@ -30,7 +30,7 @@ kullanıcının rakamları ve ilerleme notu depo DIŞINDA (`..\DEVAM-NOTU.md`) d
 
 Para düzeni: gelir havuzu yok (eski havuz/şelale kodu eski kurulumlar için duruyor). Maaşta
 `gelirDagitimi` (ayın planı kalır, `yatirim_tutari` ± artan bütçe yatırıma). Haftalık fark
-`artanButce`'ye; eksiye düşünce `kismaDagit` sonraki haftayı kısar; `aySonundan[pzt]` işaretli haftanın açığı sayılmaz (`/hafta/:pzt/ay-sonundan`). Hareket yazılınca `yerel-api.js › sonraDuzelt`: o tarihteki kapanmış haftanın farkı (donmuş limitlerle) yeniden hesaplanır, bu haftanın kısması ve bekleyen kart ödemeleri güncellenir. Kart ödemesi kesimden sonraki gün oluşur (`kartOdemesi`: açılış borcu ilk ekstrede). `aySonuTahmini` sonraki aylara düşen taksit paylarını geri ekler, kalemlerde `alt` (kategori başına ayrılan/aşım) döner, gelecek ayın erken maaşını saymaz ve kısmayı "kalan limitler harcanır" varsayımıyla hesaplar. `aile` işaretli gider/sabit
+`artanButce`'ye; eksiye düşünce `kismaDagit` sonraki haftayı kısar; `aySonundan[pzt]` işaretli haftanın açığı sayılmaz (`/hafta/:pzt/ay-sonundan`). Hareket yazılınca `yerel-api.js › sonraDuzelt`: o tarihteki kapanmış haftanın farkı (donmuş limitlerle) yeniden hesaplanır, bu haftanın kısması ve bekleyen kart ödemeleri güncellenir. Kart ödemesi kesimden sonraki gün oluşur (`kartOdemesi`: açılış borcu ilk ekstrede). `aySonuTahmini` haftalıkları gün payıyla sayar (bugün–ay sonu arasındaki günler, haftanın ayından bağımsız), sonraki aylara düşen taksit paylarını geri ekler, kalemlerde `alt` (kategori başına ayrılan/aşım) döner, gelecek ayın erken maaşını saymaz ve kısmayı "kalan limitler harcanır" varsayımıyla hesaplar. `aile` işaretli gider/sabit
 bütçeye girmez → `aileAlacagi`. `ARTAN_KATEGORI = 'artan-butce'` sanal kategori.
 
 ## Kurallar
