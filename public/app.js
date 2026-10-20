@@ -1971,8 +1971,8 @@ function ayOzetiKarti(o) {
 function tahminAc() {
   const t = H.aySonuTahmini(D.veri, bugun());
   sayfaAc(`${sayfaBaslik('Ay sonu tahmini')}
-    <div class="bilgi kucuk">${e(H.tarihYaz(t.son, true))}, maaştan önceki gün: kart borçları ödenmiş ve bu ayın kalan limitleri harcanmış sayılırsa elinde kalan. Limiti aşılan kategori 0 sayılır; ailenin ödediği taksit hem borç hem alacak olduğu için hesaba girmez.</div>
-    <div class="kart ince">${t.kalemler.map((k) => `<div class="satir"><span class="ad">${e(k.ad)}</span><span class="tutar">${para(k.tutar, { isaret: true })}</span></div>`).join('')}
+    <div class="bilgi kucuk">${e(H.tarihYaz(t.son, true))}, maaştan önceki gün: kart borçları ödenmiş ve bu ayın kalan limitleri harcanmış sayılırsa elinde kalan. Limit içindeki harcama tahmini değiştirmez (o para ayrılmış); limiti aşılan kategori 0 sayılır. Taksitli alışverişin yalnız bu ayın payı düşer; ailenin ödediği taksit hem borç hem alacak olduğu için hesaba girmez.</div>
+    <div class="kart ince">${t.kalemler.map((k) => `<div class="satir"><span class="ad">${e(k.ad)}${(k.alt || []).map((x) => `<span class="tahmin-alt"><span>${e(x.ad)}</span><span>${x.asim ? `<span class="uyari">${para(x.asim)} aşıldı</span> · ` : ''}${para(x.tutar)} ayrıldı</span></span>`).join('')}</span><span class="tutar">${para(k.tutar, { isaret: true })}</span></div>`).join('')}
       <div class="satir"><span class="ad"><b>Ay sonu tahmini</b></span><span class="tutar"><b>${para(t.tutar)}</b></span></div></div>
     ${t.aySonundan ? `<div class="soluk kucuk" style="text-align:center">İçinde ay sonundan düşülen açıklar: ${para(t.aySonundan)}</div>` : ''}`);
 }
@@ -1980,7 +1980,7 @@ function tahminAc() {
 // ================================================================ olaylar
 
 // Ayarlar başlığında görünür; her yayında elle artırılır (1.0 → 1.1 …).
-const SURUM = '1.12';
+const SURUM = '1.13';
 
 const EYLEMLER = {
   tahmin: () => tahminAc(),

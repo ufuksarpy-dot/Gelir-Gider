@@ -64,3 +64,24 @@ test('gelecek ayın maaşı erken yatınca tahmin maaştan önceki günü göste
   o.g.gun = '2026-11-10'; // yeni ayda maaş sayılır
   assert.ok(await o.tahmin() > once);
 });
+
+test('taksitli alışverişte tahminden yalnız bu ayın payı düşer', async () => {
+  const o = await kur('2026-10-19');
+  const bas = await o.tahmin();
+  await o.iste('/islem', 'POST', { id: 'tahmin-taksit', tarih: o.g.gun, tur: 'gider', tutar: 300000, kaynak_id: 'k-tahm', kategori_id: 'diger', taksit: 3, plan_disi: 1 });
+  const t = H.aySonuTahmini(await o.iste('/veri'), o.g.gun);
+  assert.equal(t.tutar, bas - 100000);
+  assert.equal(t.kalemler.find((k) => k.ad === 'Sonraki aylara düşen taksitler').tutar, 200000);
+});
+
+test('dökümde her kategori için ayrılan para; aşılan kategori 0 ve aşımı', async () => {
+  const o = await kur('2026-10-19');
+  await o.gider(30000, 'yemek');
+  const limit = Math.round(120000 * 22 / 31);
+  await o.gider(limit + 34100, 'diger');
+  const t = H.aySonuTahmini(await o.iste('/veri'), o.g.gun);
+  const haftalik = t.kalemler.find((k) => k.ad === 'Kalan haftalık bütçeler');
+  assert.deepEqual(haftalik.alt.map((x) => [x.ad, x.tutar]), [['Yemek', 140000 * 3 - 30000], ['Gezme', 140000 * 3]]);
+  assert.equal(-haftalik.tutar, haftalik.alt.reduce((a, x) => a + x.tutar, 0));
+  assert.ok(!t.kalemler.some((k) => k.ad === 'Kalan aylık bütçeler')); // tek aylık kategori aşıldı
+});

@@ -1,6 +1,6 @@
 // Üretildi: node yayinla.js — elle değiştirme.
 // Uygulama dosyaları önbellekte: internet olmadan da açılır. Veri zaten telefonda (depo.js).
-const ONBELLEK = 'usy-43065e808131';
+const ONBELLEK = 'usy-30a128e12980';
 const KABUK = ["./","index.html","app.js","hesap.js","depo.js","yerel-api.js","excel.js","ice-aktar.js","deneme.js","vendor/morphdom.js","vendor/xlsx.full.min.js","manifest.json","icon-180.png","icon-192.png","icon-512.png"];
 
 self.addEventListener('install', (e) => {

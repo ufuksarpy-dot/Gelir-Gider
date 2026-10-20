@@ -899,9 +899,16 @@ export function aySonuTahmini(veri, gun) {
   const kat = haritala(veri.kategoriler);
   const odemeler = new Map((veri.odemeler || []).map((o) => [o.id, o]));
   const kalemler = [];
-  const ekle = (ad, tutar) => { if (tutar) kalemler.push({ ad, tutar }); };
+  const ekle = (ad, tutar, alt) => { if (tutar) kalemler.push(alt?.length ? { ad, tutar, alt } : { ad, tutar }); };
   ekle('Kullanılabilir bakiye', hesaplar);
   ekle('Kart borcu', kartBorcu);
+  // Kart borcunda taksitli alışverişin tamamı var; sonraki bütçe aylarına düşen paylar o ayların planındadır.
+  let taksitler = 0;
+  for (const i of canli(veri.islemler)) {
+    if (i.tur !== 'gider' || !(i.taksit > 1) || i.aile) continue;
+    for (const p of taksitPaylari(i)) if (p.tarih > son) taksitler += p.tutar;
+  }
+  ekle('Sonraki aylara düşen taksitler', taksitler);
   ekle('Aileden alacak', aileAlacagi(veri));
 
   let sabit = 0;
@@ -915,15 +922,20 @@ export function aySonuTahmini(veri, gun) {
   ekle('Kalan sabit ödemeler', -sabit);
 
   // Sonraki hafta bu haftanın açığı kadar kısılacaksa o kadar az harcanır ("ay sonundan düş" seçilmişse kısılmaz).
-  let haftalik = 0;
+  // Dökümde her kategori için ayrılan para (alt satırlar).
+  const ayrilan = new Map();
+  const ayir = (id, x) => ayrilan.set(id, (ayrilan.get(id) || 0) + x);
   const buHafta = pazartesi(gun);
-  const sonrakiKisma = toplam(Object.values(sonrakiHaftaKismasi(veri, gun, { hepsiHarcanir: true })));
+  const sonrakiKisma = sonrakiHaftaKismasi(veri, gun, { hepsiHarcanir: true });
   for (const p of ayHaftalari(ay, ayar)) {
     if (p < buHafta) continue;
-    if (p === buHafta) haftalik += toplam(haftaDurumu(veri, p, gun).satirlar, (s) => Math.max(0, s.kalan));
-    else haftalik += toplam(Object.values(haftaLimitleri(veri, p))) - (p === ekleGun(buHafta, 7) ? sonrakiKisma : 0);
+    if (p === buHafta) for (const s of haftaDurumu(veri, p, gun).satirlar) ayir(s.kategori_id, Math.max(0, s.kalan));
+    else for (const [id, l] of Object.entries(haftaLimitleri(veri, p))) ayir(id, l - (p === ekleGun(buHafta, 7) ? Number(sonrakiKisma[id]) || 0 : 0));
   }
-  ekle('Kalan haftalık bütçeler', -haftalik);
+  const altSatirlar = (idler, asim = new Map()) => idler.filter((id) => ayrilan.get(id) || asim.get(id))
+    .map((id) => ({ ad: kat.get(id)?.ad || '?', tutar: ayrilan.get(id) || 0, asim: asim.get(id) || 0 }));
+  const haftalikIdler = [...ayrilan.keys()].sort((a, b) => (kat.get(a)?.sira ?? 0) - (kat.get(b)?.sira ?? 0));
+  ekle('Kalan haftalık bütçeler', -toplam(haftalikIdler, (id) => ayrilan.get(id)), altSatirlar(haftalikIdler));
 
   const oran = ayOrani(ay, ayar);
   const harcanan = new Map();
@@ -934,11 +946,17 @@ export function aySonuTahmini(veri, gun) {
     if (kova === 'aylik') harcanan.set(i.kategori_id, (harcanan.get(i.kategori_id) || 0) + butcePayi(i));
     else if (kova === 'beklenmeyen') beklenmeyenHarcanan += butcePayi(i);
   }
-  let aylik = 0;
+  // Limiti aşılan kategori 0 ayrılır (aşım dökümde gösterilir); limitsiz kategori hiç ayrılmaz.
+  const aylikIdler = [];
+  const asim = new Map();
   for (const k of aktifler(veri.kategoriler)) {
-    if (k.tur === 'aylik' && !k.is_gideri) aylik += Math.max(0, yuvarla(k.limit_tutar * oran) - (harcanan.get(k.id) || 0));
+    if (k.tur !== 'aylik' || k.is_gideri || !(Number(k.limit_tutar) > 0)) continue;
+    const kalan = yuvarla(k.limit_tutar * oran) - (harcanan.get(k.id) || 0);
+    aylikIdler.push(k.id);
+    ayrilan.set(k.id, Math.max(0, kalan));
+    if (kalan < 0) asim.set(k.id, -kalan);
   }
-  ekle('Kalan aylık bütçeler', -aylik);
+  ekle('Kalan aylık bütçeler', -toplam(aylikIdler, (id) => ayrilan.get(id)), altSatirlar(aylikIdler, asim));
   ekle('Kalan beklenmeyen payı', -Math.max(0, yuvarla((Number(ayar.beklenmeyen) || 0) * oran) - beklenmeyenHarcanan));
 
   const banka = new Set(aktifler(veri.hesaplar).filter((h) => h.tur !== 'kart' && h.tur !== 'yatirim' && h.id !== ayar.yatirim_hesabi).map((h) => h.id));
