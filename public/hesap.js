@@ -488,13 +488,15 @@ export function buHaftaKismasi(veri, gun) {
 }
 
 // Bu haftanın açığından sonraki haftaya yazılacak kısmanın tahmini (hafta kapanınca bakım yazar; bkz. bakimAdimlari 3b).
-// "Ay sonundan düş" işaretliyse açık sayılmaz.
-export function sonrakiHaftaKismasi(veri, gun) {
+// "Ay sonundan düş" işaretliyse açık sayılmaz. `hepsiHarcanir`: kalan limitler de harcanırsa (ay sonu tahmini böyle
+// varsayar) hafta yalnız aşımlar kadar eksiye düşer; yoksa şimdiki net fark (başka kategoride kalan para aşımı kapatır).
+export function sonrakiHaftaKismasi(veri, gun, { hepsiHarcanir = false } = {}) {
   const pzt = pazartesi(gun);
   const h = haftaDurumu(veri, pzt, gun);
   if (h.kapali) return {};
   const buKisma = toplam(Object.values(veri.kismalar?.[pzt] || {}), Number);
-  const fark = veri.aySonundan?.[pzt] ? Math.max(0, h.kalan) : h.kalan;
+  const net = hepsiHarcanir ? toplam(h.satirlar, (s) => Math.min(0, s.kalan)) : h.kalan;
+  const fark = veri.aySonundan?.[pzt] ? Math.max(0, net) : net;
   const t = artanButce(veri) + fark + buKisma;
   return t < 0 ? kismaDagit(veri, ekleGun(pzt, 7), -t) : {};
 }
@@ -656,6 +658,28 @@ export function kartDonemBorcu(veri, kart, donem) {
   return t;
 }
 
+// Ekstre ödemesi: dönem borcu; kartın açılış günü bu dönemdeyse açılıştaki borç da eklenir (o güne kadar
+// karta yapılan ödemeler düşülerek). Açılış günü kurulumdaki kartlarda başlangıç günüdür.
+export function kartOdemesi(veri, kart, donem) {
+  let t = kartDonemBorcu(veri, kart, donem);
+  const acilisGunu = kart.acilis_tarihi || ayarBirlestir(veri.ayar).kurulum_tarihi;
+  const acilisBorcu = -(Number(kart.acilis_bakiye) || 0);
+  if (acilisBorcu > 0 && acilisGunu && acilisGunu >= donem.bas && acilisGunu <= donem.kesim) {
+    const odenen = toplam(canli(veri.islemler).filter((i) => i.tur === 'transfer' && i.hedef_id === kart.id && i.tarih <= donem.kesim), (i) => i.tutar);
+    t += Math.max(0, acilisBorcu - odenen);
+  }
+  return t;
+}
+
+// Son ödeme gününden dönemi bulur (kesim ayı son ödemenin ayı ya da bir öncesi).
+export function sonOdemeDonemi(kart, sonOdeme) {
+  for (const ay of [sonOdeme.slice(0, 7), ekleAy(sonOdeme.slice(0, 7), -1)]) {
+    const d = kartDonemi(kart, ay);
+    if (d.sonOdeme === sonOdeme) return d;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------- bakım
 
 const odemeKimligi = {
@@ -728,18 +752,35 @@ export function bakimAdimlari(veri, gun, simdiIso = new Date().toISOString()) {
     }
   }
 
-  // 4 · Kart son ödemesi: kesim geçince dönem borcu tahminiyle ödeme oluşur.
-  // Bu bakımda işlenen otomatik ödemeler (karttan abonelik) de döneme katılır.
+  // 4 · Kart son ödemesi: kesimden sonraki gün dönem borcu tahminiyle ödeme oluşur (kesim günü girilen harcama da girsin).
+  // Bu bakımda işlenen otomatik ödemeler (karttan abonelik) de döneme katılır. Bekleyen ödemenin tutarı
+  // sonradan girilen harcamalarla güncellenir (sonuc.kartGuncel).
   const kartVerisi = { ...veri, islemler: [...(veri.islemler || []), ...sonuc.otomatikler.map((a) => a.islem)] };
   for (const kart of aktifler(veri.hesaplar)) {
     if (kart.tur !== 'kart' || !kart.kesim_gunu || !kart.son_odeme_gunu) continue;
     for (let ay = ekleAy(altSinir.slice(0, 7), -1); ay <= gun.slice(0, 7); ay = ekleAy(ay, 1)) {
       const d = kartDonemi(kart, ay);
-      if (d.kesim > gun || d.kesim < altSinir) continue;
-      const tutar = kartDonemBorcu(kartVerisi, kart, d);
+      if (d.kesim >= gun || d.kesim < altSinir) continue;
+      const tutar = kartOdemesi(kartVerisi, kart, d);
       if (tutar <= 0) continue;
       yeniOdeme({ id: odemeKimligi.kart(kart.id, d.sonOdeme), tur: 'kart', sebep: 'kart', ref_id: kart.id, vade: d.sonOdeme, ad: `${kart.ad} ödemesi (tahmini)`, tutar, kaynak_id: kart.odeme_hesap_id || ayar.harcama_hesabi, hedef_id: kart.id });
     }
+  }
+  sonuc.kartGuncel = kartOdemeGuncellemeleri(kartVerisi);
+  return sonuc;
+}
+
+// Bekleyen kart ödemelerinin güncel tutarı (dönemin harcamaları değiştiyse): [{ id, tutar }].
+export function kartOdemeGuncellemeleri(veri) {
+  const kartlar = haritala(veri.hesaplar);
+  const sonuc = [];
+  for (const o of veri.odemeler || []) {
+    if (o.tur !== 'kart' || o.durum !== 'bekliyor') continue;
+    const kart = kartlar.get(o.ref_id);
+    const d = kart && sonOdemeDonemi(kart, o.vade);
+    if (!d) continue;
+    const tutar = kartOdemesi(veri, kart, d);
+    if (tutar > 0 && tutar !== o.tutar) sonuc.push({ id: o.id, tutar });
   }
   return sonuc;
 }
@@ -847,9 +888,12 @@ export function gecenAyaGore(veri, gun) {
 // Kullanılabilir bakiye − kart borcu + aileden alacak − bu ay kalan sabit ödemeler − haftalık ve aylık
 // limitlerin kalanı (aşılan kategori 0; limitsiz kategori bir şey eklemez) − beklenmeyen payının kalanı −
 // yatırıma bekleyen havaleler. Ailenin ödediği sabit hem borç hem alacak olduğu için hiç sayılmaz.
+// Gelecek ayın maaşı erken yattıysa (bkz. maasAyi) tahmin o maaş hiç gelmemiş gibi yapılır: maaş, ondan doğan
+// havaleler ve artan bütçe aktarımı sayılmaz (tahmin maaştan önceki günün parasıdır).
 export function aySonuTahmini(veri, gun) {
   const ayar = ayarBirlestir(veri.ayar);
   const ay = butceAyi(gun, ayar);
+  veri = gelecekMaassiz(veri, ay);
   const { bas, son } = ayAraligi(ay, ayar);
   const { hesaplar, kartBorcu } = varlikDagilimi(veri);
   const kat = haritala(veri.kategoriler);
@@ -873,7 +917,7 @@ export function aySonuTahmini(veri, gun) {
   // Sonraki hafta bu haftanın açığı kadar kısılacaksa o kadar az harcanır ("ay sonundan düş" seçilmişse kısılmaz).
   let haftalik = 0;
   const buHafta = pazartesi(gun);
-  const sonrakiKisma = toplam(Object.values(sonrakiHaftaKismasi(veri, gun)));
+  const sonrakiKisma = toplam(Object.values(sonrakiHaftaKismasi(veri, gun, { hepsiHarcanir: true })));
   for (const p of ayHaftalari(ay, ayar)) {
     if (p < buHafta) continue;
     if (p === buHafta) haftalik += toplam(haftaDurumu(veri, p, gun).satirlar, (s) => Math.max(0, s.kalan));
@@ -902,6 +946,20 @@ export function aySonuTahmini(veri, gun) {
   ekle('Yatırıma gidecek havaleler', -havale);
 
   return { ay, son, tutar: toplam(kalemler, (x) => x.tutar), kalemler, aySonundan: aySonundanDusulen(veri, ay, gun) };
+}
+
+function gelecekMaassiz(veri, ay) {
+  const ayar = ayarBirlestir(veri.ayar);
+  const maaslar = new Set(canli(veri.islemler).filter((i) => i.tur === 'gelir' && i.gelir_kaynagi === 'Maaş' && maasAyi(i.tarih, ayar) > ay).map((i) => i.id));
+  if (!maaslar.size) return veri;
+  const odemeler = (veri.odemeler || []).filter((o) => o.sebep === 'gelir' && maaslar.has(o.ref_id));
+  const odemeIdleri = new Set(odemeler.map((o) => o.id));
+  return {
+    ...veri,
+    islemler: (veri.islemler || []).filter((i) => !maaslar.has(i.id) && !odemeIdleri.has(i.odeme_id)),
+    odemeler: (veri.odemeler || []).filter((o) => !odemeIdleri.has(o.id)),
+    artanAktarimlari: (veri.artanAktarimlari || []).filter((a) => !maaslar.has(a.gelir_id)),
+  };
 }
 
 // Son n bütçe ayının sonundaki net varlık (bu ay için bugün). Kurulumdan öncesi yok.

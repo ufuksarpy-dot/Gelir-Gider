@@ -60,8 +60,9 @@ test('sürmekte olan haftanın açığı ay sonundan düşülürse sonraki hafta
   const once = H.aySonuTahmini(v, gun).tutar;
   assert.equal((await isaretle('2026-10-19', true)).durum, 200);
   v = await veri();
-  // İşaretsizken sonraki hafta 50.000 kısılacağı için tahmin o kadar yüksekti; işaretlenince kısma yok, tahmin düşer.
-  assert.equal(H.aySonuTahmini(v, gun).tutar, once - 50000);
+  // İşaretsizken sonraki hafta kısılacağı için tahmin o kadar yüksekti; işaretlenince kısma yok, tahmin düşer.
+  // Tahmin kalan limitlerin de harcanacağını varsayar: yemekte kalan 50.000 de harcanırsa açık 100.000 olur.
+  assert.equal(H.aySonuTahmini(v, gun).tutar, once - 100000);
   assert.deepEqual(H.sonrakiHaftaKismasi(v, gun), {});
   assert.equal(H.aySonuTahmini(v, gun).aySonundan, 50000);
   gun = '2026-10-26';

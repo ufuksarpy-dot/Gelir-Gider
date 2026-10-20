@@ -186,16 +186,28 @@ test('salı: haftalık limiti aşan market harcaması', async () => {
   assert.ok(H.dikkatListesi(v, gun).some((d) => d.tur === 'asim'));
 });
 
-test('15 Eki: otomatik abonelik işlendi, kart kesildi, ödeme tahmini oluştu', async () => {
+test('15 Eki: otomatik abonelik işlendi, kart kesildi; ödeme tahmini ertesi gün oluşur', async () => {
   gun = '2026-10-15';
-  const v = await veri();
+  let v = await veri();
   const muzik = v.odemeler.find((o) => o.id === 'sabit:sab-muzik:2026-10-14');
   assert.equal(muzik.durum, 'yapildi');
   assert.ok(v.islemler.some((i) => i.id === muzik.islem_id && i.kaynak_id === 'kart-1'));
+  assert.equal(v.odemeler.some((o) => o.id === 'kart:kart-1:2026-10-25'), false); // kesim günü: henüz yok
+  // Kesim günü girilen harcama da ekstreye girer.
+  await iste('/islem', { yontem: 'POST', govde: { id: 'kesim-gunu-1', tarih: gun, tur: 'gider', tutar: 5000, kaynak_id: 'kart-1', kategori_id: 'kat-kiyafet' } });
+  gun = '2026-10-16';
+  v = await veri();
   const kart = v.odemeler.find((o) => o.id === 'kart:kart-1:2026-10-25');
   assert.ok(kart, 'kart ödemesi yok');
-  assert.equal(kart.tutar, 100000 + 9900); // taksidin ilk payı + abonelik
+  // taksidin ilk payı + abonelik + kesim günü harcaması + açılıştaki kart borcu
+  assert.equal(kart.tutar, 100000 + 9900 + 5000 + 50000);
   assert.equal(kart.kaynak_id, 'vds-1');
+  // Döneme sonradan girilen harcama bekleyen ödemenin tutarını günceller; silinince geri iner.
+  await iste('/islem', { yontem: 'POST', govde: { id: 'kesim-gec-1', tarih: '2026-10-10', tur: 'gider', tutar: 2000, kaynak_id: 'kart-1', kategori_id: 'kat-kiyafet' } });
+  assert.equal((await veri()).odemeler.find((o) => o.id === kart.id).tutar, kart.tutar + 2000);
+  await iste('/islem/kesim-gec-1', { yontem: 'DELETE' });
+  await iste('/islem/kesim-gunu-1', { yontem: 'DELETE' });
+  assert.equal((await veri()).odemeler.find((o) => o.id === kart.id).tutar, 100000 + 9900 + 50000);
 });
 
 test('19 Eki pazartesi: geçen hafta kapandı, aşım artan bütçeye; bu haftanın limitleri kısıldı', async () => {
@@ -216,9 +228,18 @@ test('19 Eki pazartesi: geçen hafta kapandı, aşım artan bütçeye; bu haftan
   assert.equal((await iste('/kisma/2026-10-19', { yontem: 'PUT', govde: { dagilim: { 'kat-yemek': 40000 } } })).durum, 200);
   assert.equal(H.haftaLimitleri(await veri(), '2026-10-19')['kat-yemek'], 20000);
   assert.equal((await iste('/kisma/2026-10-26', { yontem: 'PUT', govde: { dagilim: {} } })).durum, 404);
-  // Kapanan hafta dondu: sonradan eklenen eski tarihli harcama farkı değiştirmez.
+  // Kapanan haftaya sonradan girilen harcama: limitler donmuş kalır, fark ve bu haftanın kısması güncellenir.
   await iste('/islem', { yontem: 'POST', govde: { id: 'hk-gec-1', tarih: '2026-10-14', tur: 'gider', tutar: 1000, kaynak_id: 'vds-1', kategori_id: 'kat-yemek' } });
-  assert.equal(H.haftaDurumu(await veri(), '2026-10-12', gun).fark, -40000);
+  let v2 = await veri();
+  assert.equal(H.haftaDurumu(v2, '2026-10-12', gun).fark, -41000);
+  assert.equal(JSON.parse(v2.haftalar.find((x) => x.pazartesi === '2026-10-12').limitler)['kat-market'], 150000);
+  assert.equal(H.artanButce(v2), -41000);
+  assert.equal(Object.values(v2.kismalar['2026-10-19']).reduce((t, x) => t + x, 0), 41000);
+  // Silinince eski hâline döner (kullanıcının dağılımı toplam değiştiği için yeniden hesaplanmıştı).
+  await iste('/islem/hk-gec-1', { yontem: 'DELETE' });
+  v2 = await veri();
+  assert.equal(H.haftaDurumu(v2, '2026-10-12', gun).fark, -40000);
+  assert.equal(Object.values(v2.kismalar['2026-10-19']).reduce((t, x) => t + x, 0), 40000);
 });
 
 test('Ekim planı: içindeyken limit değişince bu ayın planı yeniden hesaplanır', async () => {

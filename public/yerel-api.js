@@ -136,8 +136,45 @@ function bakim(B, gun, zorla = false) {
     const o = B.odeme.find((x) => x.id === a.odeme_id && x.durum === 'bekliyor');
     if (o) Object.assign(o, { durum: 'yapildi', islem_id: a.islem.id, kapanis: zaman });
   }
+  kartOdemeleriniGuncelle(B, s.kartGuncel);
   B.ayar.son_bakim = gun;
   return true;
+}
+
+function kartOdemeleriniGuncelle(B, liste = H.kartOdemeGuncellemeleri(veriYukle(B))) {
+  for (const k of liste || []) {
+    const o = B.odeme.find((x) => x.id === k.id && x.durum === 'bekliyor');
+    if (o) o.tutar = k.tutar;
+  }
+}
+
+// Sürmekte olan haftanın kısması artan bütçeye göre yeniden hesaplanır (aynı toplamda kullanıcının dağılımı kalır).
+function kismaYenile(B, gun) {
+  const buHafta = H.pazartesi(gun);
+  B.kisma ||= {};
+  if (B.hafta.some((h) => h.pazartesi === buHafta)) return;
+  const yeni = H.buHaftaKismasi(veriYukle(B), gun);
+  const toplamT = (o) => Object.values(o || {}).reduce((t, x) => t + x, 0);
+  if (!toplamT(yeni)) delete B.kisma[buHafta];
+  else if (toplamT(yeni) !== toplamT(B.kisma[buHafta])) B.kisma[buHafta] = yeni;
+}
+
+// Hareket eklenince, düzeltilince ya da silinince: o tarihlerdeki kapanmış haftanın sonucu yeniden hesaplanır
+// (limitler donmuş kalır; ör. pazarın harcaması pazartesi girildi), gerekirse bu haftanın kısması ve bekleyen
+// kart ödemelerinin tutarı güncellenir.
+function sonraDuzelt(B, tarihler, gun) {
+  const v = veriYukle(B);
+  const toplamT = (o) => Object.values(o).reduce((t, x) => t + Number(x), 0);
+  let degisti = false;
+  for (const h of B.hafta) {
+    const pazar = H.ekleGun(h.pazartesi, 6);
+    if (!tarihler.some((t) => t && t >= h.pazartesi && t <= pazar)) continue;
+    const harcanan = H.haftaHarcamalari(v, h.pazartesi);
+    const fark = toplamT(JSON.parse(h.limitler)) - toplamT(harcanan);
+    if (fark !== h.fark) { Object.assign(h, { harcanan: JSON.stringify(harcanan), fark }); degisti = true; }
+  }
+  if (degisti) kismaYenile(B, gun);
+  kartOdemeleriniGuncelle(B);
 }
 
 // ---------------------------------------------------------------- doğrulama
@@ -474,13 +511,7 @@ function aySonundanDegistir(B, pzt, govde, gun) {
   B.ay_sonundan ||= {};
   if (govde.acik) B.ay_sonundan[pzt] = 1;
   else delete B.ay_sonundan[pzt];
-  B.kisma ||= {};
-  if (!B.hafta.some((h) => h.pazartesi === buHafta)) {
-    const yeni = H.buHaftaKismasi(veriYukle(B), gun);
-    const toplamT = (o) => Object.values(o || {}).reduce((t, x) => t + x, 0);
-    if (!toplamT(yeni)) delete B.kisma[buHafta];
-    else if (toplamT(yeni) !== toplamT(B.kisma[buHafta])) B.kisma[buHafta] = yeni; // aynı toplamda kullanıcının dağılımı kalır
-  }
+  kismaYenile(B, gun);
   return { tamam: true };
 }
 
@@ -535,13 +566,16 @@ function yonlendir(B, yol, yontem, govde, gun) {
   if (yol === '/kurulum' && yontem === 'POST') return kurulum(B, govde, gun);
 
   let m;
-  if (yol === '/islem' && yontem === 'POST') return islemEkle(B, govde);
+  const eskiTarih = (id) => B.islem.find((x) => x.id === id)?.tarih;
+  const sonra = (sonuc, tarihler) => { sonraDuzelt(B, tarihler, gun); return sonuc; };
+  if (yol === '/islem' && yontem === 'POST') return sonra(islemEkle(B, govde), [govde?.tarih]);
   if ((m = yol.match(/^\/islem\/([\w:.-]+)$/))) {
-    if (yontem === 'PUT') return islemGuncelle(B, m[1], govde);
-    if (yontem === 'DELETE') return islemSil(B, m[1]);
+    const once = eskiTarih(m[1]);
+    if (yontem === 'PUT') return sonra(islemGuncelle(B, m[1], govde), [once, govde?.tarih]);
+    if (yontem === 'DELETE') return sonra(islemSil(B, m[1]), [once]);
   }
   if (yol === '/gelir' && yontem === 'POST') return gelirEkle(B, govde);
-  if ((m = yol.match(/^\/odeme\/([\w:.-]+)\/(yap|atla|geri)$/)) && yontem === 'POST') return odemeIslemi(B, m[1], m[2], govde, gun);
+  if ((m = yol.match(/^\/odeme\/([\w:.-]+)\/(yap|atla|geri)$/)) && yontem === 'POST') return sonra(odemeIslemi(B, m[1], m[2], govde, gun), []);
   if ((m = yol.match(/^\/hesap\/([\w-]+)\/esitle$/)) && yontem === 'POST') return hesapEsitle(B, m[1], govde, gun);
   if ((m = yol.match(/^\/(hesap|kategori|hedef|sabit)\/([\w-]+)$/))) {
     if (yontem === 'PUT') return kayitYaz(B, m[1], m[2], govde, gun);
@@ -552,10 +586,11 @@ function yonlendir(B, yol, yontem, govde, gun) {
   if ((m = yol.match(/^\/kisma\/(\d{4}-\d{2}-\d{2})$/)) && yontem === 'PUT') return kismaDegistir(B, m[1], govde);
   if ((m = yol.match(/^\/hafta\/(\d{4}-\d{2}-\d{2})\/ay-sonundan$/)) && yontem === 'PUT') return aySonundanDegistir(B, m[1], govde, gun);
   if (yol === '/yedek-alindi' && yontem === 'POST') { B.ayar.son_yedek = gun; return { tamam: true }; }
-  if (yol === '/ice-aktar' && yontem === 'POST') return iceAktar(B, govde);
+  if (yol === '/ice-aktar' && yontem === 'POST') return sonra(iceAktar(B, govde), (Array.isArray(govde?.islemler) ? govde.islemler : []).map((i) => i?.tarih));
   if (yol === '/ice-aktar/geri' && yontem === 'POST') {
-    for (const id of Array.isArray(govde.idler) ? govde.idler : []) if (typeof id === 'string' && id.startsWith('ice-')) islemSil(B, id);
-    return { tamam: true };
+    const tarihler = [];
+    for (const id of Array.isArray(govde.idler) ? govde.idler : []) if (typeof id === 'string' && id.startsWith('ice-')) { tarihler.push(eskiTarih(id)); islemSil(B, id); }
+    return sonra({ tamam: true }, tarihler);
   }
   if (yol === '/deneme' && yontem === 'POST') return denemeKur(B, gun);
   if (yol === '/deneme' && yontem === 'DELETE') return denemeSil(B);
